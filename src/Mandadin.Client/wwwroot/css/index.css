@@ -1,0 +1,31 @@
+html, body {
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  background-color: var(--main-background, #41403e);
+}
+body {
+  padding-top: 80px;
+}
+nav .bar1, nav .bar2, nav .bar3 {
+  height: 2px;
+}
+
+.cursor.pointer {
+  cursor: pointer;
+}
+
+.mandadin-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.mandadin-main {
+  margin: 1em auto;
+}
+
+.mandadin-footer {
+  margin: auto 0 0 0;
+}

@@ -1,0 +1,25 @@
+<nav class="border fixed split-nav">
+    <div class="nav-brand">
+        <h3><a href="#">Mandadin</a></h3>
+    </div>
+    <div class="collapsible">
+        <input id="hamburgerMenu" type="checkbox" name="hamburgerMenu">
+        <label for="hamburgerMenu">
+            <div class="bar1"></div>
+            <div class="bar2"></div>
+            <div class="bar3"></div>
+        </label>
+        <div class="collapsible-body">
+            <ul class="inline">
+                <li><a onclick="${GoToNotes}">Notes</a></li>
+                <li><a onclick="${GoToLists}">My Lists</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+<main class="paper container">
+    ${Body}
+</main>
+<footer>
+    ${Footer}
+</footer>
