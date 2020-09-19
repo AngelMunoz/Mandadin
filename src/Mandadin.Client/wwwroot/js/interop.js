@@ -1,49 +1,43 @@
+import { SwitchTheme, GetTheme } from '/js/theme.js'
+import { CopyTextToClipboard, ReadTextFromClipboard } from '/js/clipboard.js'
+import { CanShare, ShareContent } from '/js/share.js'
 import {
-    FindNotes,
-    SaveNote,
-    FindNote,
+  FindNotes,
+  CreateNote,
+  UpdateNote,
+  FindNote,
+  DeleteNote
 } from '/js/database.js';
 
+
 (function(window) {
-    window.Mandadin = window.Mandadin || {
-        Theme: {
-            /**
-             * interacts with the HTML Element to switch classes
-             * @param {'Light' | 'Dark'} theme
-             */
-            SwitchTheme(theme) {
-                const html = document.querySelector('html');
-                switch (theme) {
-                    case 'Dark':
-                        if (html.classList.contains('dark')) { return; }
-                        html.classList.add('dark');
-                        break;
+  window.Mandadin = window.Mandadin || {
+    Theme: {
+      SwitchTheme,
+      GetTheme
+    },
+    Share: {
+      CanShare,
+      ShareContent
+    },
+    Clipboard: {
+      CopyTextToClipboard,
+      ReadTextFromClipboard
+    },
+    Database: {
+      FindNotes,
+      CreateNote,
+      UpdateNote,
+      FindNote,
+      DeleteNote
+    }
+  };
+  console.info(window.Mandadin);
 
-                    case 'Light':
-                        if (!html.classList.contains('dark')) { return; }
-                        html.classList.remove('dark');
-                        break;
-                }
-            }
-        },
-        ShareAPI: {
-
-        },
-        ClipboardAPI: {
-
-        },
-        Database: {
-            FindNotes,
-            SaveNote,
-            FindNote
-        }
-    };
-    console.info(window.Mandadin);
-
-    // window.Mandadin.Database.SaveNote("Alv2")
-    //     .then(result => {
-    //         console.log(result);
-    //         return window.Mandadin.Database.FindNotes();
-    //     });
+  // window.Mandadin.Database.SaveNote("Alv2")
+  //     .then(result => {
+  //         console.log(result);
+  //         return window.Mandadin.Database.FindNotes();
+  //     });
 
 })(window)
