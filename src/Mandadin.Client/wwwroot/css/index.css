@@ -29,3 +29,39 @@ nav .bar1, nav .bar2, nav .bar3 {
 .mandadin-footer {
   margin: auto 0 0 0;
 }
+
+.notes-form {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+}
+
+.notes-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  align-items: center;
+}
+.note-list-item {
+  display: flex;
+  flex-direction: column;
+  align-content: space-evenly;
+  align-items: stretch;
+}
+
+.m-1 {
+  margin: 1em;
+}
+.m-05 {
+  margin: 0.5em;
+}
+
+.my-1 {
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.mx-1 {
+  margin-left: 1em;
+  margin-right: 1em;
+}
