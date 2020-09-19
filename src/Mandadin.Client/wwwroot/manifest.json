@@ -1,15 +1,15 @@
 {
-    "name": "fsharp_pwa3",
-    "short_name": "fsharp_pwa3",
-    "start_url": "./",
+    "name": "Mandadin",
+    "short_name": "Mandadin",
+    "start_url": "/",
     "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#03173d",
     "icons": [
         {
-            "src": "icon-512.png",
-            "type": "image/png",
-            "sizes": "512x512"
+            "src": "icon.png",
+            "sizes": "512x512",
+            "type": "image/png"
         }
-    ]
+    ],
+    "background_color": "#41403e",
+    "theme_color": "#FFFFFF "
 }

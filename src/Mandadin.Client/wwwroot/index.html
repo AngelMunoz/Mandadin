@@ -4,18 +4,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="msapplication-TileImage" content="icon.png">
+  <meta name="msapplication-TileColor" content="#41403e">
   <title>Mandadin 4</title>
   <base href="/">
-  <link rel="stylesheet" href="https://unpkg.com/papercss@1.8.0/dist/paper.min.css">
+  <link rel="stylesheet" href="lib/paper.min.css">
   <link rel="stylesheet" href="css/index.css">
   <link href="manifest.json" rel="manifest" />
-  <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="icon.png" />
+
 </head>
 
 <body>
   <div id="main">Loading...</div>
-  <script src="//cdn.jsdelivr.net/npm/pouchdb@7.2.1/dist/pouchdb.min.js"></script>
-  <script src="js/database.js" type="module"></script>
+  <script src="lib/pouchdb-7.2.1.min.js"></script>
   <script src="js/interop.js" type="module"></script>
   <script src="_framework/blazor.webassembly.js"></script>
   <script>navigator.serviceWorker.register('service-worker.js');</script>
