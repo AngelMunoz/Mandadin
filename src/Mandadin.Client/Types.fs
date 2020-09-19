@@ -25,17 +25,11 @@ type Note =
   }
 
 
-type TrackList =
-  {
-    Id: string
-    Name: string
-    Rev: string
-  }
+type TrackList = { Id: string; Rev: string }
 
 type TrackListItem =
   {
     Id: string
-    Name: string
     IsDone: bool
     ListId: string
     Rev: string
@@ -47,6 +41,7 @@ type Icon =
   | Trash
   | Clipboard
   | Save
+  | Text
 
 [<RequireQualifiedAccess>]
 module Icon =
@@ -55,6 +50,7 @@ module Icon =
   type Trash = Template<"wwwroot/icons/trash.html">
   type Clipboard = Template<"wwwroot/icons/clipboard.html">
   type Save = Template<"wwwroot/icons/save.html">
+  type Text = Template<"wwwroot/icons/text.html">
 
   let Get (icon: Icon) (color: Option<string>): Node =
     let color = defaultArg color "currentColor"
@@ -64,3 +60,4 @@ module Icon =
     | Trash -> Trash().Fill(color).Elt()
     | Clipboard -> Clipboard().Fill(color).Elt()
     | Save -> Save().Fill(color).Elt()
+    | Text -> Text().Fill(color).Elt()
