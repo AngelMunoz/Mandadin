@@ -45,3 +45,8 @@ type Note = {
     content: string
     rev: string
 }
+
+type List = {
+    id: string
+    rev: string
+}
