@@ -6,7 +6,11 @@ import {
   CreateNote,
   UpdateNote,
   FindNote,
-  DeleteNote
+  DeleteNote,
+  FindLists,
+  CreateList,
+  ListNameExists,
+  DeleteList
 } from '/js/database.js';
 
 
@@ -29,15 +33,12 @@ import {
       CreateNote,
       UpdateNote,
       FindNote,
-      DeleteNote
+      DeleteNote,
+      FindLists,
+      CreateList,
+      ListNameExists,
+      DeleteList
     }
   };
   console.info(window.Mandadin);
-
-  // window.Mandadin.Database.SaveNote("Alv2")
-  //     .then(result => {
-  //         console.log(result);
-  //         return window.Mandadin.Database.FindNotes();
-  //     });
-
 })(window)
