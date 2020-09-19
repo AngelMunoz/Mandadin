@@ -9,7 +9,12 @@ open Bolero.Remoting.Client
 
 module Main =
 
-  type State = { View: View; Theme: Theme }
+  type State =
+    {
+      View: View
+      Theme: Theme
+      CanShare: bool
+    }
 
   type Msg =
     | SetView of View
@@ -17,14 +22,18 @@ module Main =
     | ChangeThemeSuccess of bool * Theme
     | GetTheme
     | GetThemeSuccess of string
+    | CanShare
+    | CanShareSuccess of bool
     | Error of exn
 
   let private init (_: 'arg): State * Cmd<Msg> =
     {
       View = View.Notes
       Theme = Theme.Dark
+      CanShare = false
     },
-    Cmd.ofMsg GetTheme
+    Cmd.batch [ Cmd.ofMsg GetTheme
+                Cmd.ofMsg CanShare ]
 
   let private update (msg: Msg) (state: State) (js: IJSRuntime): State * Cmd<Msg> =
     match msg with
@@ -57,6 +66,9 @@ module Main =
             Cmd.none
 
         { state with Theme = theme }, cmd
+    | CanShare ->
+        state, Cmd.ofJS js "Mandadin.Share.CanShare" [||] CanShareSuccess Error
+    | CanShareSuccess canShare -> { state with CanShare = canShare }, Cmd.none
     | Error err ->
         eprintfn "Update Error: [%s]" err.Message
         state, Cmd.none
@@ -113,18 +125,31 @@ module Main =
       ]
     ]
 
-
   let private view (state: State) (dispatch: Dispatch<Msg>): Node =
+    let navigateToList (route: string) =
+      View.ListDetail route |> SetView |> dispatch
+
     article [ attr.``class`` "mandadin-content" ] [
       navbar state dispatch
       main [
              attr.``class`` "paper container mandadin-main"
            ] [
         match state.View with
-        | View.Notes -> comp<Views.Notes.Page> [] []
-        | View.Lists -> comp<Views.Lists.Page> [] []
+        | View.Notes ->
+            comp<Views.Notes.Page> [ "CanShare" => state.CanShare ] []
+        | View.Lists ->
+            comp<Views.Lists.Page>
+              [
+                "OnRouteRequested" => Some(navigateToList)
+              ]
+              []
         | View.ListDetail listId ->
-            comp<Views.ListItems.Page> [ "ListId" => listId ] []
+            comp<Views.ListItems.Page>
+              [
+                "ListId" => Some listId
+                "CanShare" => state.CanShare
+              ]
+              []
       ]
       footer [
                attr.``class`` "paper row flex-spaces mandadin-footer"

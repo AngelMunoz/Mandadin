@@ -6,6 +6,7 @@ open Bolero
 open Bolero.Html
 open Bolero.Remoting.Client
 open Mandadin.Client
+open Microsoft.AspNetCore.Components
 
 [<RequireQualifiedAccess>]
 module Notes =
@@ -39,23 +40,19 @@ module Notes =
     | ToClipboard of Note
     | ToClipboardSuccess
 
-    | CanShare
-    | CanShareSuccess of bool
-
     | ShareContent of Note
     | ShareContentSuccess
 
     (* Any error will land here *)
     | Error of exn
 
-  let private init (_: 'arg) =
+  let private init (canShare: bool) =
     {
       CurrentContent = ""
       Notes = list.Empty
-      CanShare = false
+      CanShare = canShare
     },
-    Cmd.batch [ Cmd.ofMsg GetNotes
-                Cmd.ofMsg CanShare ]
+    Cmd.ofMsg GetNotes
 
   let private update (msg: Msg) (state: State) (js: IJSRuntime) =
     match msg with
@@ -135,9 +132,6 @@ module Notes =
         Cmd.ofJS js "Mandadin.Clipboard.CopyTextToClipboard" [| text |] (fun _ ->
           ToClipboardSuccess) Error
     | ToClipboardSuccess -> state, Cmd.none
-    | CanShare ->
-        state, Cmd.ofJS js "Mandadin.Share.CanShare" [||] CanShareSuccess Error
-    | CanShareSuccess canShare -> { state with CanShare = canShare }, Cmd.none
     | ShareContent note ->
         let title = "Nota"
         let text = sprintf "%s" note.Content
@@ -172,7 +166,6 @@ module Notes =
                attr.``type`` "submit"
                attr.disabled (state.CurrentContent.Length = 0)
              ] [
-        text submitBtnTxt
         Icon.Get Save None
       ]
       button [
@@ -225,6 +218,10 @@ module Notes =
   type Page() as this =
     inherit ProgramComponent<State, Msg>()
 
+    [<Parameter>]
+    member val CanShare: bool = false with get, set
+
     override _.Program =
+      let init (_: 'arg) = init this.CanShare
       let update msg state = update msg state this.JSRuntime
       Program.mkProgram init update view
