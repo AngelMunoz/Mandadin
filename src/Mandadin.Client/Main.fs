@@ -14,7 +14,9 @@ module Main =
   type Msg =
     | SetView of View
     | TryChangeTheme of Theme
-    | ChangeThemeSuccess of Theme
+    | ChangeThemeSuccess of bool * Theme
+    | GetTheme
+    | GetThemeSuccess of string
     | Error of exn
 
   let private init (_: 'arg): State * Cmd<Msg> =
@@ -22,7 +24,7 @@ module Main =
       View = View.Notes
       Theme = Theme.Dark
     },
-    Cmd.none
+    Cmd.ofMsg GetTheme
 
   let private update (msg: Msg) (state: State) (js: IJSRuntime): State * Cmd<Msg> =
     match msg with
@@ -34,9 +36,27 @@ module Main =
           | _ -> "Light"
 
         state,
-        Cmd.ofJS js "Mandadin.Theme.SwitchTheme" [| jsThemeArg |] (fun _ ->
-          ChangeThemeSuccess theme) Error
-    | ChangeThemeSuccess theme -> { state with Theme = theme }, Cmd.none
+        Cmd.ofJS js "Mandadin.Theme.SwitchTheme" [| jsThemeArg |] (fun didChange ->
+          ChangeThemeSuccess(didChange, theme)) Error
+    | ChangeThemeSuccess (didChange, theme) ->
+        if didChange
+        then { state with Theme = theme }, Cmd.none
+        else state, Cmd.ofMsg (Error(exn "Failed to change theme"))
+    | GetTheme ->
+        state, Cmd.ofJS js "Mandadin.Theme.GetTheme" [||] GetThemeSuccess Error
+    | GetThemeSuccess theme ->
+        let theme =
+          match theme with
+          | "Light" -> Theme.Light
+          | _ -> Theme.Dark
+
+        let cmd =
+          if theme <> state.Theme then
+            Cmd.ofMsg (TryChangeTheme theme)
+          else
+            Cmd.none
+
+        { state with Theme = theme }, cmd
     | Error err ->
         eprintfn "Update Error: [%s]" err.Message
         state, Cmd.none
