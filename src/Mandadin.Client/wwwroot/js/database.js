@@ -63,9 +63,9 @@ function mapAllDocs({ total_rows, offset, rows }) {
  * @returns {Promise<Note[]>}
  */
 export async function FindNotes() {
-  let result = await notes.allDocs({ include_docs: true }).then(mapAllDocs);
-  console.log(result);
-  return result;
+  let findNotesResult = await notes.allDocs({ include_docs: true }).then(mapAllDocs);
+  console.log({ result: findNotesResult });
+  return findNotesResult;
 }
 
 /**
@@ -78,9 +78,9 @@ export async function CreateNote(content) {
   /**
    * @type {DocumentOperationResult}
    */
-  const result = await notes.put(note);
-  console.log(result);
-  return { id: result.id, content, rev: result.rev };
+  const createNoteResult = await notes.put(note);
+  console.log({ createNoteResult });
+  return { id: createNoteResult.id, content, rev: createNoteResult.rev };
 }
 
 /**
@@ -93,8 +93,8 @@ export async function UpdateNote(note) {
   /**
    * @type {DocumentOperationResult}
    */
-  const result = await notes.put(toUpdate);
-  return { ...note, rev: result.rev }
+  const updateNoteResult = await notes.put(toUpdate);
+  return { ...note, rev: updateNoteResult.rev }
 }
 
 /**
@@ -124,11 +124,9 @@ export async function DeleteNote(noteid, noterev) {
  * @returns {Promise<List[]>}
  */
 export async function FindLists() {
-  let result = await lists
+  let findListResults = await lists
     .allDocs({ include_docs: true }).
     then(({ total_rows, offset, rows }) => {
-      console.log({ total_rows, offset });
-      console.table(rows);
       return rows.map(({ id, doc }) => (
         {
           id: id,
@@ -136,8 +134,8 @@ export async function FindLists() {
         }
       ));
     });
-  console.log(result);
-  return result;
+  console.log({ findListResults });
+  return findListResults;
 }
 
 /**
@@ -159,12 +157,12 @@ function FindList(name) {
  */
 export async function ListNameExists(name) {
   try {
-    const result = await FindList(name);
-    console.log(result);
+    const listNameExistsResult = await FindList(name);
+    console.log({ listNameExistsResult });
     return true;
-  } catch (error) {
-    console.log(error);
-    return error.status === 404 ? false : true;
+  } catch (listNameExistsError) {
+    console.log({ listNameExistsError });
+    return listNameExistsError.status === 404 ? false : true;
   }
 }
 
@@ -192,7 +190,7 @@ async function DeleteAllListItemsFromList(listId) {
     }
     return true;
   } catch (error) {
-    console.warn({ error });
+    console.warn({ DeleteAllListItemsFromListError: error });
     return Promise.reject(new Error('Failed to Delete All Documents For List'));
   }
 }
@@ -202,6 +200,24 @@ export async function DeleteList(listId, rev) {
     await DeleteAllListItemsFromList(listId)
     const deleteResult = await lists.remove(listId, rev)
     console.log({ deleteResult });
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
+/**
+ * 
+ * @param {string} listId
+ * @param {bool} hideDone 
+ */
+export async function GetListItems(listId, hideDone) {
+  try {
+    const { docs } = await listItems.find({
+      selector: { listId, isDone: hideDone ? undefined : false },
+      fields: ['_id', '_rev', 'listId', 'isDone'],
+      use_index: `_design/${hideDone ? 'mandadinddoclistid' : 'mandadinddocisdone'}`
+    });
+    return docs.map(item => ({ id: item._id, rev: item._rev, listId: item.listId, isDone: item.isDone }))
   } catch (error) {
     return Promise.reject(error);
   }

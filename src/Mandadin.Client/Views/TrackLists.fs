@@ -15,22 +15,47 @@ module ListItems =
     {
       Items: list<TrackListItem>
       TrackListId: Option<string>
+      HideDone: bool
       CanShare: bool
     }
 
-  type Msg = SetItems of list<TrackListItem>
+  type Msg =
+    | GetItems
+    | GetItemsSuccess of seq<TrackListItem>
+
+    | Error of exn
+
 
   let init (listId: Option<string>) (canShare: bool) =
     {
       Items = []
-      TrackListId = None
+      TrackListId = listId
+      HideDone = false
       CanShare = canShare
     },
-    Cmd.none
+    Cmd.ofMsg GetItems
 
-  let update (msg: Msg) (state: State) =
+  let update (msg: Msg) (state: State) (js: IJSRuntime) =
     match msg with
-    | SetItems list -> { state with Items = list }, Cmd.none
+    | GetItems ->
+        match state.TrackListId with
+        | Some listId ->
+            state,
+            Cmd.ofJS
+              js
+              "Mandadin.Database.GetListItems"
+              [| listId; state.HideDone |]
+              GetItemsSuccess
+              Error
+        | None -> state, Cmd.ofMsg (Error(exn "ListId cannot be Empty"))
+    | GetItemsSuccess list ->
+        { state with
+            Items = list |> List.ofSeq
+        },
+        Cmd.none
+    | Error ex ->
+        eprintfn "Update Error [%s]" ex.Message
+        state, Cmd.none
 
   let view (state: State) (dispatch: Dispatch<Msg>) = Html.article [] []
 
@@ -46,6 +71,7 @@ module ListItems =
 
     override this.Program =
       let init _ = init this.ListId this.CanShare
+      let update msg state = update msg state this.JSRuntime
       Program.mkProgram init update view
 
 

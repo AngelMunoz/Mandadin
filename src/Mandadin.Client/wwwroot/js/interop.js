@@ -10,7 +10,8 @@ import {
   FindLists,
   CreateList,
   ListNameExists,
-  DeleteList
+  DeleteList,
+  GetListItems
 } from '/js/database.js';
 
 
@@ -37,7 +38,8 @@ import {
       FindLists,
       CreateList,
       ListNameExists,
-      DeleteList
+      DeleteList,
+      GetListItems
     }
   };
   console.info(window.Mandadin);
