@@ -65,6 +65,35 @@ nav .bar1, nav .bar2, nav .bar3 {
   padding: 0.5em 0;
 }
 
+.listitem-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  margin: 1em;
+}
+
+@media all and (max-width: 525px) {
+  .listitem-item {
+    width: 100%;
+    margin: 0.5em 0;
+  }
+}
+
+
+ul.notes-list li::before,
+.tracklist-list li::before {
+  content: none;
+}
+
+.listitem-item-checkbox {
+  padding: 0;
+  margin-right: 0.5em;
+}
+
+.m-0 {
+  margin: 0;
+}
+
 .m-1 {
   margin: 1em;
 }

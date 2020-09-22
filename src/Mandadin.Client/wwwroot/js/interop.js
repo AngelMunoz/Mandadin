@@ -11,7 +11,11 @@ import {
   CreateList,
   ListNameExists,
   DeleteList,
-  GetListItems
+  GetListItems,
+  ListItemExists,
+  CreateListItem,
+  UpdateListItem,
+  DeleteListItem
 } from '/js/database.js';
 
 
@@ -39,7 +43,11 @@ import {
       CreateList,
       ListNameExists,
       DeleteList,
-      GetListItems
+      GetListItems,
+      ListItemExists,
+      CreateListItem,
+      UpdateListItem,
+      DeleteListItem
     }
   };
   console.info(window.Mandadin);

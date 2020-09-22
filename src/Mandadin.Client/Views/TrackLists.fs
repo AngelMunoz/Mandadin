@@ -15,13 +15,37 @@ module ListItems =
     {
       Items: list<TrackListItem>
       TrackListId: Option<string>
+      CurrentItem: string
+      CanAddCurrentItem: bool
       HideDone: bool
       CanShare: bool
     }
 
+
+  type UpdatableItemProp =
+    | IsDone of bool
+    | Name of string
+
   type Msg =
+    | SetCurrentItem of string
+
     | GetItems
     | GetItemsSuccess of seq<TrackListItem>
+
+    | ValidateItem of string
+    | ValidateItemSuccess of itemExists: bool * name: string
+
+    | ValidateExisting of TrackListItem
+    | ValidateExistingSuccess of itemExists: bool * item: TrackListItem
+    | UpdateItemProp of item: TrackListItem * prop: UpdatableItemProp
+    | UpdateItemPropSuccess of TrackListItem
+
+    | DeleteItem of TrackListItem
+    | DeleteItemSuccess of TrackListItem
+
+    | CreateItem of string
+    | CreateItemSuccess of TrackListItem
+
 
     | Error of exn
 
@@ -31,12 +55,19 @@ module ListItems =
       Items = []
       TrackListId = listId
       HideDone = false
+      CurrentItem = ""
+      CanAddCurrentItem = false
       CanShare = canShare
     },
     Cmd.ofMsg GetItems
 
   let update (msg: Msg) (state: State) (js: IJSRuntime) =
+    let emptyListId =
+      state, Cmd.ofMsg (Error(exn "ListId cannot be Empty"))
+
     match msg with
+    | SetCurrentItem item ->
+        { state with CurrentItem = item }, Cmd.ofMsg (ValidateItem(item))
     | GetItems ->
         match state.TrackListId with
         | Some listId ->
@@ -47,17 +78,154 @@ module ListItems =
               [| listId; state.HideDone |]
               GetItemsSuccess
               Error
-        | None -> state, Cmd.ofMsg (Error(exn "ListId cannot be Empty"))
+        | None -> emptyListId
     | GetItemsSuccess list ->
         { state with
             Items = list |> List.ofSeq
         },
         Cmd.none
+    | ValidateItem item ->
+        match state.TrackListId with
+        | Some listid ->
+            let onSuccess nameExists = ValidateItemSuccess(nameExists, item)
+            state,
+            Cmd.ofJS
+              js
+              "Mandadin.Database.ListItemExists"
+              [| listid; state.CurrentItem |]
+              onSuccess
+              Error
+        | None -> emptyListId
+    | ValidateItemSuccess (nameExists, itemName) ->
+        let canAdd = not nameExists && itemName.Length <> 0
+        { state with
+            CanAddCurrentItem = canAdd
+        },
+        Cmd.none
+
+    | CreateItem item ->
+        match state.TrackListId with
+        | Some listid ->
+            state,
+            Cmd.ofJS
+              js
+              "Mandadin.Database.CreateListItem"
+              [| listid; item |]
+              CreateItemSuccess
+              Error
+        | None -> emptyListId
+    | CreateItemSuccess item ->
+        { state with
+            Items = item :: state.Items
+        },
+        Cmd.none
+    | UpdateItemProp (item, prop) ->
+        match prop with
+        | IsDone isDone ->
+            state,
+            Cmd.ofJS
+              js
+              "Mandadin.Database.UpdateListItem"
+              [| { item with IsDone = isDone } |]
+              UpdateItemPropSuccess
+              Error
+        | Name name ->
+            state, Cmd.ofMsg (ValidateExisting { item with Name = name })
+    | ValidateExisting item ->
+        state,
+        Cmd.ofJS js "Mandadin.Database.ListItemExists"
+          [| item.ListId; item.Name |] (fun exists ->
+          ValidateExistingSuccess(exists, item)) Error
+    | ValidateExistingSuccess (exists, item) ->
+        match exists with
+        | true -> state, Cmd.none
+        | false ->
+            state,
+            Cmd.ofJS
+              js
+              "Mandadin.Database.UpdateListItem"
+              [| item |]
+              UpdateItemPropSuccess
+              Error
+    | UpdateItemPropSuccess item ->
+        let items =
+          state.Items
+          |> List.map (fun i -> if i.Id = item.Id then item else i)
+
+        { state with Items = items }, Cmd.none
+    | DeleteItem item ->
+        state,
+        Cmd.ofJS
+          js
+          "Mandadin.Database.DeleteListItem"
+          [| item |]
+          DeleteItemSuccess
+          Error
+    | DeleteItemSuccess item ->
+        let items =
+          state.Items
+          |> List.filter (fun i -> i.Id <> item.Id)
+
+        { state with Items = items }, Cmd.none
     | Error ex ->
         eprintfn "Update Error [%s]" ex.Message
         state, Cmd.none
 
-  let view (state: State) (dispatch: Dispatch<Msg>) = Html.article [] []
+  let private newItemForm (state: State) (dispatch: Dispatch<Msg>) =
+    let currentContentTxt = "Nombre del objeto..."
+    form [
+           attr.``class`` "row flex-spaces background-muted border notes-form"
+           on.submit (fun _ -> CreateItem state.CurrentItem |> dispatch)
+         ] [
+      fieldset [ attr.``class`` "form-group" ] [
+        label [ attr.``for`` "current-content" ] [
+          text currentContentTxt
+        ]
+        textarea [
+                   attr.id "current-content"
+                   attr.placeholder currentContentTxt
+                   bind.input.string
+                     state.CurrentItem
+                     (SetCurrentItem >> dispatch)
+                 ] []
+      ]
+      button [
+               attr.``type`` "submit"
+               attr.disabled (not state.CanAddCurrentItem)
+             ] [
+        Icon.Get Save None
+      ]
+    ]
+
+  let private listItem (item: TrackListItem) (dispatch: Dispatch<Msg>) =
+    li [
+         attr.key item.Id
+         attr.``class`` "listitem-item"
+       ] [
+      input [ attr.``type`` "checkbox"
+              attr.``class`` "listitem-item-checkbox"
+              attr.id item.Id
+              bind.``checked`` item.IsDone (fun isDone ->
+                UpdateItemProp(item, (IsDone isDone)) |> dispatch) ]
+      input [ bind.input.string item.Name (fun name ->
+                ValidateExisting { item with Name = name }
+                |> dispatch) ]
+      button [
+               attr.``class`` "paper-btn btn-small btn-danger-outline m-0"
+               on.click (fun _ -> DeleteItem item |> dispatch)
+             ] [
+        Icon.Get Trash None
+      ]
+    ]
+
+  let view (state: State) (dispatch: Dispatch<Msg>) =
+    article [] [
+      newItemForm state dispatch
+      ul [ attr.``class`` "tracklist-list" ] [
+        for item in state.Items do
+          listItem item dispatch
+      ]
+    ]
 
 
   type Page() =
@@ -201,7 +369,7 @@ module Lists =
       ]
     ]
 
-  let listItem (item: TrackList) (dispatch: Dispatch<Msg>) =
+  let private listItem (item: TrackList) (dispatch: Dispatch<Msg>) =
     li [
          attr.``class`` "tracklist-item row flex-spaces"
        ] [

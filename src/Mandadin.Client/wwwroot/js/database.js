@@ -15,12 +15,20 @@ const listItems = new PouchDB("listItems");
     });
     const isDoneIndex = listItems.createIndex({
       index: {
-        fields: ['isDone', 'listId'],
+        fields: ['listId', 'isDone'],
         name: 'isDoneIndex',
         ddoc: 'mandadinddocisdone',
       }
     });
-    const createIndexesResult = await Promise.all([listIdIndex, isDoneIndex]);
+    const listItemNameIndex = listItems.createIndex({
+      index: {
+        fields: ['listId', 'name'],
+        name: 'listItemNameIndex',
+        ddoc: 'mandadinddoclistitemnameindex',
+      },
+      sort: ['name']
+    });
+    const createIndexesResult = await Promise.all([listIdIndex, isDoneIndex, listItemNameIndex]);
     console.log({ createIndexesResult });
   } catch (error) {
     console.warn(`Error creating index for ListItems [${error.message}]`);
@@ -62,10 +70,13 @@ function mapAllDocs({ total_rows, offset, rows }) {
 /**
  * @returns {Promise<Note[]>}
  */
-export async function FindNotes() {
-  let findNotesResult = await notes.allDocs({ include_docs: true }).then(mapAllDocs);
-  console.log({ result: findNotesResult });
-  return findNotesResult;
+export function FindNotes() {
+  return notes.allDocs({ include_docs: true })
+    .then(mapAllDocs)
+    .then(findNotesResult => {
+      console.log({ result: findNotesResult });
+      return findNotesResult
+    });
 }
 
 /**
@@ -113,18 +124,23 @@ export function FindNote(noteid) {
  * @returns {Promise<[string, string]>}
  */
 export async function DeleteNote(noteid, noterev) {
-  const { id, ok, rev } = await notes.remove(noteid, noterev);
-  if (ok) {
+  try {
+    const { id, ok, rev } = await notes.remove(noteid, noterev);
+    if (!ok) {
+      return Promise.reject(`Failed to delete document with id: [${id}]`);
+    }
     return [id, rev];
+  } catch (deleteNoteError) {
+    console.warn({ deleteNoteError });
+    return Promise.reject(deleteNoteError.message);
   }
-  throw new Error(`Failed to delete document with id: [${id}]`);
 }
 
 /**
  * @returns {Promise<List[]>}
  */
 export async function FindLists() {
-  let findListResults = await lists
+  return lists
     .allDocs({ include_docs: true }).
     then(({ total_rows, offset, rows }) => {
       return rows.map(({ id, doc }) => (
@@ -133,9 +149,11 @@ export async function FindLists() {
           rev: doc._rev
         }
       ));
+    })
+    .then(findListResults => {
+      console.log({ findListResults });
+      return findListResults;
     });
-  console.log({ findListResults });
-  return findListResults;
 }
 
 /**
@@ -161,8 +179,11 @@ export async function ListNameExists(name) {
     console.log({ listNameExistsResult });
     return true;
   } catch (listNameExistsError) {
-    console.log({ listNameExistsError });
-    return listNameExistsError.status === 404 ? false : true;
+    if (listNameExistsError.status === 404) {
+      return false;
+    }
+    console.warn({ listNameExistsError });
+    return true;
   }
 }
 
@@ -191,7 +212,7 @@ async function DeleteAllListItemsFromList(listId) {
     return true;
   } catch (error) {
     console.warn({ DeleteAllListItemsFromListError: error });
-    return Promise.reject(new Error('Failed to Delete All Documents For List'));
+    return Promise.reject('Failed to Delete All Documents For List');
   }
 }
 
@@ -200,10 +221,23 @@ export async function DeleteList(listId, rev) {
     await DeleteAllListItemsFromList(listId)
     const deleteResult = await lists.remove(listId, rev)
     console.log({ deleteResult });
-  } catch (error) {
-    return Promise.reject(error);
+  } catch (deleteListError) {
+    console.warn({ deleteListError })
+    return Promise.reject(deleteListError.message);
   }
 }
+
+function buildIndexQuery(listId, hideDone) {
+  const selector =
+    hideDone === false ? { listId } : { listId, hideDone: false }
+
+  return {
+    fields: ['_id', '_rev', 'listId', 'isDone', 'name'],
+    use_index: `_design/${hideDone ? 'mandadinddoclistid' : 'mandadinddocisdone'}`,
+    selector,
+  }
+}
+
 
 /**
  * 
@@ -212,13 +246,73 @@ export async function DeleteList(listId, rev) {
  */
 export async function GetListItems(listId, hideDone) {
   try {
-    const { docs } = await listItems.find({
-      selector: { listId, isDone: hideDone ? undefined : false },
-      fields: ['_id', '_rev', 'listId', 'isDone'],
-      use_index: `_design/${hideDone ? 'mandadinddoclistid' : 'mandadinddocisdone'}`
-    });
-    return docs.map(item => ({ id: item._id, rev: item._rev, listId: item.listId, isDone: item.isDone }))
-  } catch (error) {
-    return Promise.reject(error);
+    const index = buildIndexQuery(listId, hideDone)
+    const { docs } = await listItems.find(index);
+    return docs.map(({ _id, _rev, listId, isDone, name }) =>
+      ({ id: _id, rev: _rev, listId, isDone, name }));
+  } catch (getListItemsError) {
+    console.warn({ getListItemsError })
+    return Promise.reject(getListItemsError.message);
   }
+}
+/**
+ * 
+ * @param {string} name 
+ * @returns {Promise<boolean>}
+ */
+export function ListItemExists(listId, name) {
+  return listItems.find({
+    selector: { listId, name },
+    fields: ['name'],
+    use_index: '_design/mandadinddoclistitemnameindex'
+  })
+    .then(({ docs }) => docs.length > 0)
+    .catch(listItemExistsError => {
+      console.log({ listItemExistsError });
+      return Promise.reject(listItemExistsError.message);
+    });
+}
+
+export async function CreateListItem(listId, name) {
+  try {
+    const { id, ok } = await listItems.put({
+      isDone: false,
+      _id: `${listId}:${Date.now()}`,
+      name,
+      listId
+    });
+    if (!ok) { return Promise.reject('Could not create document'); }
+    const { _id, isDone, _rev, ...props } = await listItems.get(id);
+    return { id: _id, rev: _rev, listId: props.listId, name: props.name, isDone };
+  } catch (createListItemError) {
+    console.warn({ createListItemError })
+    return Promise.reject(createListItemError.message);
+  }
+}
+
+/**
+ * 
+ * @param {ListItem} item
+ * @return {Promise<ListItem>}
+ */
+export async function UpdateListItem(item) {
+  try {
+    const { id, rev, ...itemProps } = item
+    const { ok, ...result } = await listItems.put({ _id: id, _rev: rev, ...itemProps })
+    if (!ok) { return Promise.reject('Failed to update ListItem'); }
+    return { ...item, ...result };
+  } catch (updateListItemError) {
+    console.warn({ updateListItemError });
+    return Promise.reject(updateListItemError.message);
+  }
+}
+
+/**
+ * updates the document with the property `_deleted: true` to enable undo actions
+ * @param {ListItem} item
+ * @return {Promise<ListItem>}
+ */
+export function DeleteListItem(item) {
+  return UpdateListItem({ ...item, _deleted: true })
+    .then(item => ({ ...item, _deleted: undefined }));
 }
