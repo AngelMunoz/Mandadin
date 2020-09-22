@@ -32,6 +32,7 @@ type TrackListItem =
     Id: string
     IsDone: bool
     ListId: string
+    Name: string
     Rev: string
   }
 

@@ -50,3 +50,11 @@ type List = {
     id: string
     rev: string
 }
+
+type ListItem = {
+    id: string
+    isDone: boolean
+    listId: string
+    name: string
+    rev: string
+}
