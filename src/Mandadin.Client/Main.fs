@@ -129,8 +129,15 @@ module Main =
     let navigateToList (route: string) =
       View.ListDetail route |> SetView |> dispatch
 
-    article [ attr.``class`` "mandadin-content" ] [
-      navbar state dispatch
+    let isNotesOrLists =
+      state.View = View.Lists || state.View = View.Notes
+
+    let paddedClass addPadd = if addPadd then " with-80px-pad" else ""
+    article [
+              attr.``class``
+                (sprintf "mandadin-content%s" (paddedClass isNotesOrLists))
+            ] [
+      if isNotesOrLists then navbar state dispatch
       main [
              attr.``class`` "paper container mandadin-main"
            ] [

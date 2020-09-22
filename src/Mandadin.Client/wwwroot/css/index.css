@@ -4,9 +4,6 @@ html, body {
   margin: 0;
   background-color: var(--main-background, #41403e);
 }
-body {
-  padding-top: 80px;
-}
 nav .bar1, nav .bar2, nav .bar3 {
   height: 2px;
 }
@@ -20,6 +17,9 @@ nav .bar1, nav .bar2, nav .bar3 {
   flex-direction: column;
   height: calc(100vh - 80px);
   overflow-y: auto;
+}
+.mandadin-content.with-80px-pad {
+  padding-top: 80px;
 }
 
 .mandadin-main {
@@ -61,8 +61,7 @@ nav .bar1, nav .bar2, nav .bar3 {
   flex-direction: row;
   align-content: space-evenly;
   align-items: stretch;
-  width: 100%;
-  padding: 0.5em 0;
+  padding: 1em;
 }
 
 .listitem-item {
@@ -70,12 +69,15 @@ nav .bar1, nav .bar2, nav .bar3 {
   align-items: center;
   justify-content: space-around;
   margin: 1em;
+  padding: 1em;
 }
 
 @media all and (max-width: 525px) {
+  .tracklist-item,
   .listitem-item {
     width: 100%;
     margin: 0.5em 0;
+    padding: 0;
   }
 }
 
