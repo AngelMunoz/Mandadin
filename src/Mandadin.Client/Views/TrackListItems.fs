@@ -101,21 +101,21 @@ module ListItems =
     | RequestHideDone ->
         let listId = defaultArg state.TrackListId "X"
         state,
-        Cmd.ofJS js "Mandadin.Database.GetHideDone" [| listId |]
+        Cmd.OfJS.either js "Mandadin.Database.GetHideDone" [| listId |]
           RequestHideDoneSuccess (fun _ -> GetItems)
     | RequestHideDoneSuccess hideDone ->
         { state with HideDone = hideDone }, Cmd.ofMsg GetItems
     | SaveHideDone ->
         let listId = defaultArg state.TrackListId "X"
         state,
-        Cmd.ofJS js "Mandadin.Database.SaveHideDone"
+        Cmd.OfJS.either js "Mandadin.Database.SaveHideDone"
           [| listId; state.HideDone |] (fun _ -> SaveHideDoneSuccess) Error
     | SaveHideDoneSuccess -> state, Cmd.none
     | GetItems ->
         match state.TrackListId with
         | Some listId ->
             state,
-            Cmd.ofJS
+            Cmd.OfJS.either
               js
               "Mandadin.Database.GetListItems"
               [| listId; state.HideDone |]
@@ -135,7 +135,7 @@ module ListItems =
         | Some listid ->
             let onSuccess nameExists = ValidateItemSuccess(nameExists, item)
             state,
-            Cmd.ofJS
+            Cmd.OfJS.either
               js
               "Mandadin.Database.ListItemExists"
               [| listid; state.CurrentItem |]
@@ -153,7 +153,7 @@ module ListItems =
         match state.TrackListId with
         | Some listid ->
             state,
-            Cmd.ofJS
+            Cmd.OfJS.either
               js
               "Mandadin.Database.CreateListItem"
               [| listid; item |]
@@ -171,7 +171,7 @@ module ListItems =
         match prop with
         | IsDone isDone ->
             state,
-            Cmd.ofJS
+            Cmd.OfJS.either
               js
               "Mandadin.Database.UpdateListItem"
               [| { item with IsDone = isDone } |]
@@ -181,7 +181,7 @@ module ListItems =
             state, Cmd.ofMsg (ValidateExisting { item with Name = name })
     | ValidateExisting item ->
         state,
-        Cmd.ofJS js "Mandadin.Database.ListItemExists"
+        Cmd.OfJS.either js "Mandadin.Database.ListItemExists"
           [| item.ListId; item.Name |] (fun exists ->
           ValidateExistingSuccess(exists, item)) Error
     | ValidateExistingSuccess (exists, item) ->
@@ -189,7 +189,7 @@ module ListItems =
         | true -> state, Cmd.none
         | false ->
             state,
-            Cmd.ofJS
+            Cmd.OfJS.either
               js
               "Mandadin.Database.UpdateListItem"
               [| item |]
@@ -216,7 +216,7 @@ module ListItems =
         state, cmd
     | DeleteItem item ->
         state,
-        Cmd.ofJS
+        Cmd.OfJS.either
           js
           "Mandadin.Database.DeleteListItem"
           [| item |]
@@ -237,8 +237,8 @@ module ListItems =
         let stringified = stringifyItems items
         let idValue = defaultArg state.TrackListId "Mandadin"
         state,
-        Cmd.ofJS js "Mandadin.Share.ShareContent" [| idValue; stringified |] (fun _ ->
-          ShareRequestSuccess) Error
+        Cmd.OfJS.either js "Mandadin.Share.ShareContent"
+          [| idValue; stringified |] (fun _ -> ShareRequestSuccess) Error
     | ShareRequestSuccess -> state, Cmd.none
     | Error ex ->
         eprintfn "Update Error [%s]" ex.Message

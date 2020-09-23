@@ -14,8 +14,8 @@
     <Compile Include="Startup.fs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Bolero" Version="0.14.16" />
-    <PackageReference Include="Bolero.Build" Version="0.14.16" />
+    <PackageReference Include="Bolero" Version="0.15.23" />
+    <PackageReference Include="Bolero.Build" Version="0.15.23" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Build" Version="3.2.0" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="3.2.0" />
     <PackageReference Include="System.Text.Json" Version="5.0.0-rc.1.20451.14" />

@@ -94,7 +94,12 @@ module Lists =
         | None -> state, Cmd.none
     | GetLists ->
         state,
-        Cmd.ofJS js "Mandadin.Database.FindLists" [||] GetListsSuccess Error
+        Cmd.OfJS.either
+          js
+          "Mandadin.Database.FindLists"
+          [||]
+          GetListsSuccess
+          Error
     | GetListsSuccess items ->
         { state with
             TrackLists = items |> List.ofSeq
@@ -102,7 +107,7 @@ module Lists =
         Cmd.none
     | ValidateListName name ->
         state,
-        Cmd.ofJS js "Mandadin.Database.ListNameExists" [| name |] (fun exists ->
+        Cmd.OfJS.either js "Mandadin.Database.ListNameExists" [| name |] (fun exists ->
           ValidateListNameSuccess(exists, name)) Error
     | ValidateListNameSuccess (nameExists, name) ->
         if nameExists then
@@ -115,7 +120,7 @@ module Lists =
           Cmd.none
     | CreateList name ->
         state,
-        Cmd.ofJS
+        Cmd.OfJS.either
           js
           "Mandadin.Database.CreateList"
           [| name |]
@@ -132,7 +137,7 @@ module Lists =
         Cmd.none
     | FromClipboard ->
         state,
-        Cmd.ofJS
+        Cmd.OfJS.either
           js
           "Mandadin.Clipboard.ReadTextFromClipboard"
           [||]
@@ -155,7 +160,7 @@ module Lists =
         { state with FromClipboard = None }, cmd
     | CreateFromImport (title, items) ->
         state,
-        Cmd.ofJS
+        Cmd.OfJS.either
           js
           "Mandadin.Database.ImportList"
           [| title; items |]
@@ -175,8 +180,8 @@ module Lists =
         state, cmd
     | DeleteList item ->
         state,
-        Cmd.ofJS js "Mandadin.Database.DeleteList" [| item.Id; item.Rev |] (fun _ ->
-          DeleteListSuccess item) Error
+        Cmd.OfJS.either js "Mandadin.Database.DeleteList"
+          [| item.Id; item.Rev |] (fun _ -> DeleteListSuccess item) Error
     | DeleteListSuccess item ->
         let list =
           state.TrackLists

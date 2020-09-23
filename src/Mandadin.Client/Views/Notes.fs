@@ -60,7 +60,7 @@ module Notes =
         { state with CurrentContent = content }, Cmd.none
     | DeleteNote (noteid, rev) ->
         state,
-        Cmd.ofJS
+        Cmd.OfJS.either
           js
           "Mandadin.Database.DeleteNote"
           [| noteid; rev |]
@@ -76,7 +76,12 @@ module Notes =
         { state with Notes = notes }, Cmd.none
     | GetNotes ->
         state,
-        Cmd.ofJS js "Mandadin.Database.FindNotes" [||] GetNotesSuccess Error
+        Cmd.OfJS.either
+          js
+          "Mandadin.Database.FindNotes"
+          [||]
+          GetNotesSuccess
+          Error
     | GetNotesSuccess notes ->
         { state with
             Notes = notes |> List.ofSeq
@@ -84,7 +89,7 @@ module Notes =
         Cmd.none
     | CreateNote content ->
         state,
-        Cmd.ofJS
+        Cmd.OfJS.either
           js
           "Mandadin.Database.CreateNote"
           [| content |]
@@ -97,7 +102,7 @@ module Notes =
         Cmd.none
     | UpdateNote note ->
         state,
-        Cmd.ofJS
+        Cmd.OfJS.either
           js
           "Mandadin.Database.UpdateNote"
           [| note |]
@@ -116,7 +121,7 @@ module Notes =
         Cmd.none
     | FromClipboard ->
         state,
-        Cmd.ofJS
+        Cmd.OfJS.either
           js
           "Mandadin.Clipboard.ReadTextFromClipboard"
           [||]
@@ -129,14 +134,14 @@ module Notes =
           sprintf "Nota Mandadin:\n%s " note.Content
 
         state,
-        Cmd.ofJS js "Mandadin.Clipboard.CopyTextToClipboard" [| text |] (fun _ ->
+        Cmd.OfJS.either js "Mandadin.Clipboard.CopyTextToClipboard" [| text |] (fun _ ->
           ToClipboardSuccess) Error
     | ToClipboardSuccess -> state, Cmd.none
     | ShareContent note ->
         let title = "Nota"
         let text = sprintf "%s" note.Content
         state,
-        Cmd.ofJS js "Mandadin.Share.ShareContent" [| title; text; "" |] (fun _ ->
+        Cmd.OfJS.either js "Mandadin.Share.ShareContent" [| title; text; "" |] (fun _ ->
           ShareContentSuccess) Error
     | ShareContentSuccess -> state, Cmd.none
     | Error err ->

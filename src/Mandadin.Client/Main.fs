@@ -45,14 +45,15 @@ module Main =
           | _ -> "Light"
 
         state,
-        Cmd.ofJS js "Mandadin.Theme.SwitchTheme" [| jsThemeArg |] (fun didChange ->
+        Cmd.OfJS.either js "Mandadin.Theme.SwitchTheme" [| jsThemeArg |] (fun didChange ->
           ChangeThemeSuccess(didChange, theme)) Error
     | ChangeThemeSuccess (didChange, theme) ->
         if didChange
         then { state with Theme = theme }, Cmd.none
         else state, Cmd.ofMsg (Error(exn "Failed to change theme"))
     | GetTheme ->
-        state, Cmd.ofJS js "Mandadin.Theme.GetTheme" [||] GetThemeSuccess Error
+        state,
+        Cmd.OfJS.either js "Mandadin.Theme.GetTheme" [||] GetThemeSuccess Error
     | GetThemeSuccess theme ->
         let theme =
           match theme with
@@ -67,7 +68,8 @@ module Main =
 
         { state with Theme = theme }, cmd
     | CanShare ->
-        state, Cmd.ofJS js "Mandadin.Share.CanShare" [||] CanShareSuccess Error
+        state,
+        Cmd.OfJS.either js "Mandadin.Share.CanShare" [||] CanShareSuccess Error
     | CanShareSuccess canShare -> { state with CanShare = canShare }, Cmd.none
     | Error err ->
         eprintfn "Update Error: [%s]" err.Message
