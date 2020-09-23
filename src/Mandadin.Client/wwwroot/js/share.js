@@ -25,5 +25,5 @@ export function ShareContent(title, text, url = undefined) {
     if (navigator.share) {
         return navigator.share({ title, text, url });
     }
-    return Promise.reject(new Error("Share API not available"));
+    return Promise.reject('Share API not available');
 }

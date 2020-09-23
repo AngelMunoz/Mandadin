@@ -6,8 +6,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Types.fs" />
+    <Compile Include="Modals.fs" />
     <Compile Include="Views/Notes.fs" />
     <Compile Include="Views/TrackLists.fs" />
+    <Compile Include="Views/TrackListItems.fs" />
     <Compile Include="Main.fs" />
     <Compile Include="Startup.fs" />
   </ItemGroup>

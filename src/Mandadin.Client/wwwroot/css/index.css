@@ -79,6 +79,9 @@ nav .bar1, nav .bar2, nav .bar3 {
     margin: 0.5em 0;
     padding: 0;
   }
+  .mandadin-content:not(.with-80px-pad) {
+    height: 100vh
+  }
 }
 
 

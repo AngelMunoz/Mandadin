@@ -9,13 +9,16 @@ import {
   DeleteNote,
   FindLists,
   CreateList,
+  ImportList,
   ListNameExists,
   DeleteList,
   GetListItems,
   ListItemExists,
   CreateListItem,
   UpdateListItem,
-  DeleteListItem
+  DeleteListItem,
+  GetHideDone,
+  SaveHideDone
 } from '/js/database.js';
 
 
@@ -41,13 +44,16 @@ import {
       DeleteNote,
       FindLists,
       CreateList,
+      ImportList,
       ListNameExists,
       DeleteList,
       GetListItems,
       ListItemExists,
       CreateListItem,
       UpdateListItem,
-      DeleteListItem
+      DeleteListItem,
+      GetHideDone,
+      SaveHideDone
     }
   };
   console.info(window.Mandadin);

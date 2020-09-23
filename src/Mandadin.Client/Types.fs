@@ -43,6 +43,9 @@ type Icon =
   | Clipboard
   | Save
   | Text
+  | Import
+  | Close
+  | Check
 
 [<RequireQualifiedAccess>]
 module Icon =
@@ -52,6 +55,9 @@ module Icon =
   type Clipboard = Template<"wwwroot/icons/clipboard.html">
   type Save = Template<"wwwroot/icons/save.html">
   type Text = Template<"wwwroot/icons/text.html">
+  type Import = Template<"wwwroot/icons/import.html">
+  type Close = Template<"wwwroot/icons/close.html">
+  type Check = Template<"wwwroot/icons/check.html">
 
   let Get (icon: Icon) (color: Option<string>): Node =
     let color = defaultArg color "currentColor"
@@ -62,3 +68,6 @@ module Icon =
     | Clipboard -> Clipboard().Fill(color).Elt()
     | Save -> Save().Fill(color).Elt()
     | Text -> Text().Fill(color).Elt()
+    | Import -> Import().Fill(color).Elt()
+    | Close -> Close().Fill(color).Elt()
+    | Check -> Check().Fill(color).Elt()

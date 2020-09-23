@@ -8,249 +8,35 @@ open Bolero.Remoting.Client
 open Mandadin.Client
 open Microsoft.AspNetCore.Components
 
-
-[<RequireQualifiedAccess>]
-module ListItems =
-  type State =
-    {
-      Items: list<TrackListItem>
-      TrackListId: Option<string>
-      CurrentItem: string
-      CanAddCurrentItem: bool
-      HideDone: bool
-      CanShare: bool
-    }
-
-
-  type UpdatableItemProp =
-    | IsDone of bool
-    | Name of string
-
-  type Msg =
-    | SetCurrentItem of string
-
-    | GetItems
-    | GetItemsSuccess of seq<TrackListItem>
-
-    | ValidateItem of string
-    | ValidateItemSuccess of itemExists: bool * name: string
-
-    | ValidateExisting of TrackListItem
-    | ValidateExistingSuccess of itemExists: bool * item: TrackListItem
-    | UpdateItemProp of item: TrackListItem * prop: UpdatableItemProp
-    | UpdateItemPropSuccess of TrackListItem
-
-    | DeleteItem of TrackListItem
-    | DeleteItemSuccess of TrackListItem
-
-    | CreateItem of string
-    | CreateItemSuccess of TrackListItem
-
-
-    | Error of exn
-
-
-  let init (listId: Option<string>) (canShare: bool) =
-    {
-      Items = []
-      TrackListId = listId
-      HideDone = false
-      CurrentItem = ""
-      CanAddCurrentItem = false
-      CanShare = canShare
-    },
-    Cmd.ofMsg GetItems
-
-  let update (msg: Msg) (state: State) (js: IJSRuntime) =
-    let emptyListId =
-      state, Cmd.ofMsg (Error(exn "ListId cannot be Empty"))
-
-    match msg with
-    | SetCurrentItem item ->
-        { state with CurrentItem = item }, Cmd.ofMsg (ValidateItem(item))
-    | GetItems ->
-        match state.TrackListId with
-        | Some listId ->
-            state,
-            Cmd.ofJS
-              js
-              "Mandadin.Database.GetListItems"
-              [| listId; state.HideDone |]
-              GetItemsSuccess
-              Error
-        | None -> emptyListId
-    | GetItemsSuccess list ->
-        { state with
-            Items = list |> List.ofSeq
-        },
-        Cmd.none
-    | ValidateItem item ->
-        match state.TrackListId with
-        | Some listid ->
-            let onSuccess nameExists = ValidateItemSuccess(nameExists, item)
-            state,
-            Cmd.ofJS
-              js
-              "Mandadin.Database.ListItemExists"
-              [| listid; state.CurrentItem |]
-              onSuccess
-              Error
-        | None -> emptyListId
-    | ValidateItemSuccess (nameExists, itemName) ->
-        let canAdd = not nameExists && itemName.Length <> 0
-        { state with
-            CanAddCurrentItem = canAdd
-        },
-        Cmd.none
-
-    | CreateItem item ->
-        match state.TrackListId with
-        | Some listid ->
-            state,
-            Cmd.ofJS
-              js
-              "Mandadin.Database.CreateListItem"
-              [| listid; item |]
-              CreateItemSuccess
-              Error
-        | None -> emptyListId
-    | CreateItemSuccess item ->
-        { state with
-            Items = item :: state.Items
-        },
-        Cmd.none
-    | UpdateItemProp (item, prop) ->
-        match prop with
-        | IsDone isDone ->
-            state,
-            Cmd.ofJS
-              js
-              "Mandadin.Database.UpdateListItem"
-              [| { item with IsDone = isDone } |]
-              UpdateItemPropSuccess
-              Error
-        | Name name ->
-            state, Cmd.ofMsg (ValidateExisting { item with Name = name })
-    | ValidateExisting item ->
-        state,
-        Cmd.ofJS js "Mandadin.Database.ListItemExists"
-          [| item.ListId; item.Name |] (fun exists ->
-          ValidateExistingSuccess(exists, item)) Error
-    | ValidateExistingSuccess (exists, item) ->
-        match exists with
-        | true -> state, Cmd.none
-        | false ->
-            state,
-            Cmd.ofJS
-              js
-              "Mandadin.Database.UpdateListItem"
-              [| item |]
-              UpdateItemPropSuccess
-              Error
-    | UpdateItemPropSuccess item ->
-        let items =
-          state.Items
-          |> List.map (fun i -> if i.Id = item.Id then item else i)
-
-        { state with Items = items }, Cmd.none
-    | DeleteItem item ->
-        state,
-        Cmd.ofJS
-          js
-          "Mandadin.Database.DeleteListItem"
-          [| item |]
-          DeleteItemSuccess
-          Error
-    | DeleteItemSuccess item ->
-        let items =
-          state.Items
-          |> List.filter (fun i -> i.Id <> item.Id)
-
-        { state with Items = items }, Cmd.none
-    | Error ex ->
-        eprintfn "Update Error [%s]" ex.Message
-        state, Cmd.none
-
-  let private newItemForm (state: State) (dispatch: Dispatch<Msg>) =
-    let currentContentTxt = "Nombre del objeto..."
-    form [
-           attr.``class`` "row flex-spaces background-muted border notes-form"
-           on.submit (fun _ -> CreateItem state.CurrentItem |> dispatch)
-         ] [
-      fieldset [ attr.``class`` "form-group" ] [
-        label [ attr.``for`` "current-content" ] [
-          text currentContentTxt
-        ]
-        textarea [
-                   attr.id "current-content"
-                   attr.placeholder currentContentTxt
-                   bind.input.string
-                     state.CurrentItem
-                     (SetCurrentItem >> dispatch)
-                 ] []
-      ]
-      button [
-               attr.``type`` "submit"
-               attr.disabled (not state.CanAddCurrentItem)
-             ] [
-        Icon.Get Save None
-      ]
-    ]
-
-  let private listItem (item: TrackListItem) (dispatch: Dispatch<Msg>) =
-    li [
-         attr.key item.Id
-         attr.``class`` "listitem-item"
-       ] [
-      input [ attr.``type`` "checkbox"
-              attr.``class`` "listitem-item-checkbox"
-              attr.id item.Id
-              bind.``checked`` item.IsDone (fun isDone ->
-                UpdateItemProp(item, (IsDone isDone)) |> dispatch) ]
-      input [ bind.input.string item.Name (fun name ->
-                ValidateExisting { item with Name = name }
-                |> dispatch) ]
-      button [
-               attr.``class`` "paper-btn btn-small btn-danger-outline m-0"
-               on.click (fun _ -> DeleteItem item |> dispatch)
-             ] [
-        Icon.Get Trash None
-      ]
-    ]
-
-  let view (state: State) (dispatch: Dispatch<Msg>) =
-    article [] [
-      newItemForm state dispatch
-      ul [ attr.``class`` "tracklist-list" ] [
-        for item in state.Items do
-          listItem item dispatch
-      ]
-    ]
-
-
-  type Page() =
-    inherit ProgramComponent<State, Msg>()
-
-    [<Parameter>]
-    member val ListId: Option<string> = None with get, set
-
-    [<Parameter>]
-    member val CanShare: bool = false with get, set
-
-    override this.Program =
-      let init _ = init this.ListId this.CanShare
-      let update msg state = update msg state this.JSRuntime
-      Program.mkProgram init update view
-
-
 [<RequireQualifiedAccess>]
 module Lists =
+
+  let private parseContentString (content: string): array<array<obj>> =
+    let parseRow (row: string) =
+      let split = row.Split(" ] ")
+
+      let isDone =
+        match split |> Array.tryItem 0 with
+        | Some content -> content.Contains('x')
+        | None -> false
+
+      let nameStr =
+        match split |> Array.tryItem 1 with
+        | Some content -> content.Trim()
+        | None -> "Error de linea"
+
+      [| box isDone; box nameStr |]
+
+    content.Split('\n') |> Array.Parallel.map parseRow
 
   type State =
     {
       TrackLists: list<TrackList>
       CurrentListName: string
       CanAddCurrentName: bool
+      ShowConfirmDeleteModal: bool
+      ShowImportDialog: bool
+      FromClipboard: Option<string>
     }
 
   type Msg =
@@ -264,10 +50,20 @@ module Lists =
     | ValidateListNameSuccess of nameExists: bool * name: string
 
     | CreateList of string
+    | CreateFromImport of string * array<array<obj>>
     | CreateListSuccess of TrackList
 
     | DeleteList of TrackList
     | DeleteListSuccess of TrackList
+
+    | ShowConfirmDeleteModal of bool
+    | ShowConfirmDeleteModalAction of TrackList * Result<bool, unit>
+
+    | ShowImportDialog of bool
+    | ShowImportDialogAction of Result<string * string, unit>
+
+    | FromClipboard
+    | FromClipboardSuccess of string
 
     | Error of exn
 
@@ -276,6 +72,9 @@ module Lists =
       TrackLists = list.Empty
       CurrentListName = ""
       CanAddCurrentName = false
+      ShowConfirmDeleteModal = false
+      ShowImportDialog = false
+      FromClipboard = None
     },
     Cmd.ofMsg GetLists
 
@@ -324,10 +123,56 @@ module Lists =
           Error
     | CreateListSuccess list ->
         { state with
-            TrackLists = list :: state.TrackLists
+            TrackLists =
+              (list :: state.TrackLists)
+              |> List.sortBy (fun item -> item.Id)
             CurrentListName = ""
+            ShowImportDialog = false
         },
         Cmd.none
+    | FromClipboard ->
+        state,
+        Cmd.ofJS
+          js
+          "Mandadin.Clipboard.ReadTextFromClipboard"
+          [||]
+          FromClipboardSuccess
+          Error
+    | FromClipboardSuccess content ->
+        { state with
+            FromClipboard = Some content
+        },
+        Cmd.ofMsg (ShowImportDialog true)
+    | ShowImportDialog show -> { state with ShowImportDialog = show }, Cmd.none
+    | ShowImportDialogAction result ->
+        let cmd =
+          match result with
+          | Ok (title, content) ->
+              let parsed = parseContentString content
+              Cmd.ofMsg (CreateFromImport(title, parsed))
+          | _ -> Cmd.ofMsg (ShowImportDialog false)
+
+        { state with FromClipboard = None }, cmd
+    | CreateFromImport (title, items) ->
+        state,
+        Cmd.ofJS
+          js
+          "Mandadin.Database.ImportList"
+          [| title; items |]
+          CreateListSuccess
+          Error
+    | ShowConfirmDeleteModal show ->
+        { state with
+            ShowConfirmDeleteModal = show
+        },
+        Cmd.none
+    | ShowConfirmDeleteModalAction (item, result) ->
+        let cmd =
+          match result with
+          | Ok result when result -> Cmd.ofMsg (DeleteList item)
+          | _ -> Cmd.ofMsg (ShowConfirmDeleteModal false)
+
+        state, cmd
     | DeleteList item ->
         state,
         Cmd.ofJS js "Mandadin.Database.DeleteList" [| item.Id; item.Rev |] (fun _ ->
@@ -337,7 +182,11 @@ module Lists =
           state.TrackLists
           |> List.filter (fun i -> i <> item)
 
-        { state with TrackLists = list }, Cmd.none
+        { state with
+            TrackLists = list
+            ShowConfirmDeleteModal = false
+        },
+        Cmd.none
     | Error ex ->
         eprintfn "Update Error: [%s]" ex.Message
         state, Cmd.none
@@ -367,18 +216,20 @@ module Lists =
              ] [
         Icon.Get Save None
       ]
+      button [
+               attr.``class`` "paper-btn btn-small"
+               attr.``type`` "button"
+               on.click (fun _ -> FromClipboard |> dispatch)
+             ] [
+        Icon.Get Import None
+      ]
     ]
 
   let private listItem (item: TrackList) (dispatch: Dispatch<Msg>) =
     li [
          attr.``class`` "tracklist-item row flex-spaces"
+         attr.key item.Id
        ] [
-      button [
-               attr.``class`` "paper-btn btn-small btn-danger-outline"
-               on.click (fun _ -> DeleteList item |> dispatch)
-             ] [
-        Icon.Get Trash None
-      ]
       p [ attr.``class`` "m-05" ] [
         text item.Id
       ]
@@ -388,15 +239,38 @@ module Lists =
              ] [
         Icon.Get Text None
       ]
+      button [
+               attr.``class`` "paper-btn btn-small btn-danger-outline"
+               on.click (fun _ -> ShowConfirmDeleteModal true |> dispatch)
+             ] [
+        Icon.Get Trash None
+      ]
     ]
 
   let view (state: State) (dispatch: Dispatch<Msg>) =
+    let deleteModal (item: TrackList) =
+      let title = "Borrar Elemento"
+      let subtitle = "esta operacion es irreversible"
+
+      let txt =
+        sprintf """Proceder con el borrado de "%s"?""" item.Id
+
+      Modals.DeleteResourceModal (title, subtitle, txt)
+        state.ShowConfirmDeleteModal (fun result ->
+        ShowConfirmDeleteModalAction(item, result)
+        |> dispatch)
+
     article [] [
+      Modals.ImportTrackList
+        state.ShowImportDialog
+        (ShowImportDialogAction >> dispatch)
+        state.FromClipboard
       newListForm state dispatch
       ul [
            attr.``class`` "tracklist-list child-borders"
          ] [
         for item in state.TrackLists do
+          deleteModal item
           listItem item dispatch
       ]
     ]
@@ -413,3 +287,6 @@ module Lists =
         update msg state this.JSRuntime this.OnRouteRequested
 
       Program.mkProgram init update view
+#if DEBUG
+      |> Program.withConsoleTrace
+#endif

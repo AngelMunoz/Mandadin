@@ -1,7 +1,8 @@
 
-const notes = new PouchDB("notas");
-const lists = new PouchDB("lists");
-const listItems = new PouchDB("listItems");
+const Notes = new PouchDB("notas");
+const Lists = new PouchDB("lists");
+const ListItems = new PouchDB("listItems");
+const HideDone = new PouchDB("hideDone");
 
 
 (async function(listItems) {
@@ -33,7 +34,7 @@ const listItems = new PouchDB("listItems");
   } catch (error) {
     console.warn(`Error creating index for ListItems [${error.message}]`);
   }
-})(listItems)
+})(ListItems)
 
 
 /**
@@ -71,7 +72,7 @@ function mapAllDocs({ total_rows, offset, rows }) {
  * @returns {Promise<Note[]>}
  */
 export function FindNotes() {
-  return notes.allDocs({ include_docs: true })
+  return Notes.allDocs({ include_docs: true })
     .then(mapAllDocs)
     .then(findNotesResult => {
       console.log({ result: findNotesResult });
@@ -89,7 +90,7 @@ export async function CreateNote(content) {
   /**
    * @type {DocumentOperationResult}
    */
-  const createNoteResult = await notes.put(note);
+  const createNoteResult = await Notes.put(note);
   console.log({ createNoteResult });
   return { id: createNoteResult.id, content, rev: createNoteResult.rev };
 }
@@ -104,7 +105,7 @@ export async function UpdateNote(note) {
   /**
    * @type {DocumentOperationResult}
    */
-  const updateNoteResult = await notes.put(toUpdate);
+  const updateNoteResult = await Notes.put(toUpdate);
   return { ...note, rev: updateNoteResult.rev }
 }
 
@@ -114,7 +115,7 @@ export async function UpdateNote(note) {
  * @returns {Promise<Note>}
  */
 export function FindNote(noteid) {
-  return notes.get(noteid).then(mapDocument);
+  return Notes.get(noteid).then(mapDocument);
 }
 
 /**
@@ -125,7 +126,7 @@ export function FindNote(noteid) {
  */
 export async function DeleteNote(noteid, noterev) {
   try {
-    const { id, ok, rev } = await notes.remove(noteid, noterev);
+    const { id, ok, rev } = await Notes.remove(noteid, noterev);
     if (!ok) {
       return Promise.reject(`Failed to delete document with id: [${id}]`);
     }
@@ -140,7 +141,7 @@ export async function DeleteNote(noteid, noterev) {
  * @returns {Promise<List[]>}
  */
 export async function FindLists() {
-  return lists
+  return Lists
     .allDocs({ include_docs: true }).
     then(({ total_rows, offset, rows }) => {
       return rows.map(({ id, doc }) => (
@@ -162,7 +163,7 @@ export async function FindLists() {
  * @return {Promise<List>}
  */
 function FindList(name) {
-  return lists.get(name).then(doc => ({
+  return Lists.get(name).then(doc => ({
     id: doc._id,
     rev: doc._rev
   }));
@@ -193,20 +194,60 @@ export async function ListNameExists(name) {
  * @returns {Promise<List>}
  */
 export function CreateList(name) {
-  return lists.put({ _id: name })
+  return Lists.put({ _id: name })
     .then(result => ({ id: result.id, rev: result.rev }));
 }
 
+/**
+ * 
+ * @param {string} name 
+ * @param {Array<[boolean, string]>} items 
+ */
+export function ImportList(name, items) {
+  return CreateList(name)
+    .then((list) => Promise.all([BulkCreateListItems(list.id, items), list]))
+    .then(([docs, list]) => {
+      const errors = docs.filter(doc => doc.error)
+      if (errors.length > 0) {
+        console.warn(`Could not import the following docs`, errors);
+      }
+      return list;
+    })
+    .catch(importListError => {
+      console.warn({ importListError });
+      return Promise.reject(error.message);
+    });
+}
+
+/**
+ * 
+ * @param {string} listId
+ * @param {Array<[boolean, string]>} items
+ * @return {Promise<any[]>}
+ */
+function BulkCreateListItems(listId, items) {
+  const toCreate =
+    items.map(([isDone, name], index) => ({
+      _id: `${listId}:${index}:${Date.now()}`,
+      name,
+      isDone,
+      listId
+    }))
+  return ListItems.bulkDocs(toCreate);
+}
+
+
+
 async function DeleteAllListItemsFromList(listId) {
   try {
-    const queryAllResult = await listItems.find({
+    const queryAllResult = await ListItems.find({
       selector: { listId },
       use_index: '_design/mandadinddoclistid'
     })
     console.log({ queryAllResult });
     if (queryAllResult.docs && queryAllResult.docs.length > 0) {
       const docs = queryAllResult.docs.map(doc => ({ ...doc, _deleted: true }));
-      const deleteResult = await listItems.bulkDocs(docs)
+      const deleteResult = await ListItems.bulkDocs(docs)
       console.log({ deleteResult });
     }
     return true;
@@ -219,7 +260,7 @@ async function DeleteAllListItemsFromList(listId) {
 export async function DeleteList(listId, rev) {
   try {
     await DeleteAllListItemsFromList(listId)
-    const deleteResult = await lists.remove(listId, rev)
+    const deleteResult = await Lists.remove(listId, rev)
     console.log({ deleteResult });
   } catch (deleteListError) {
     console.warn({ deleteListError })
@@ -229,11 +270,11 @@ export async function DeleteList(listId, rev) {
 
 function buildIndexQuery(listId, hideDone) {
   const selector =
-    hideDone === false ? { listId } : { listId, hideDone: false }
+    hideDone === false ? { listId } : { listId, isDone: false }
 
   return {
     fields: ['_id', '_rev', 'listId', 'isDone', 'name'],
-    use_index: `_design/${hideDone ? 'mandadinddoclistid' : 'mandadinddocisdone'}`,
+    use_index: `_design/${hideDone ? 'mandadinddocisdone' : 'mandadinddoclistid'}`,
     selector,
   }
 }
@@ -247,7 +288,7 @@ function buildIndexQuery(listId, hideDone) {
 export async function GetListItems(listId, hideDone) {
   try {
     const index = buildIndexQuery(listId, hideDone)
-    const { docs } = await listItems.find(index);
+    const { docs } = await ListItems.find(index);
     return docs.map(({ _id, _rev, listId, isDone, name }) =>
       ({ id: _id, rev: _rev, listId, isDone, name }));
   } catch (getListItemsError) {
@@ -261,7 +302,7 @@ export async function GetListItems(listId, hideDone) {
  * @returns {Promise<boolean>}
  */
 export function ListItemExists(listId, name) {
-  return listItems.find({
+  return ListItems.find({
     selector: { listId, name },
     fields: ['name'],
     use_index: '_design/mandadinddoclistitemnameindex'
@@ -275,14 +316,14 @@ export function ListItemExists(listId, name) {
 
 export async function CreateListItem(listId, name) {
   try {
-    const { id, ok } = await listItems.put({
+    const { id, ok } = await ListItems.put({
       isDone: false,
       _id: `${listId}:${Date.now()}`,
       name,
       listId
     });
     if (!ok) { return Promise.reject('Could not create document'); }
-    const { _id, isDone, _rev, ...props } = await listItems.get(id);
+    const { _id, isDone, _rev, ...props } = await ListItems.get(id);
     return { id: _id, rev: _rev, listId: props.listId, name: props.name, isDone };
   } catch (createListItemError) {
     console.warn({ createListItemError })
@@ -298,7 +339,7 @@ export async function CreateListItem(listId, name) {
 export async function UpdateListItem(item) {
   try {
     const { id, rev, ...itemProps } = item
-    const { ok, ...result } = await listItems.put({ _id: id, _rev: rev, ...itemProps })
+    const { ok, ...result } = await ListItems.put({ _id: id, _rev: rev, ...itemProps })
     if (!ok) { return Promise.reject('Failed to update ListItem'); }
     return { ...item, ...result };
   } catch (updateListItemError) {
@@ -315,4 +356,33 @@ export async function UpdateListItem(item) {
 export function DeleteListItem(item) {
   return UpdateListItem({ ...item, _deleted: true })
     .then(item => ({ ...item, _deleted: undefined }));
+}
+
+
+export function GetHideDone(listId) {
+  return HideDone.get(listId)
+    .then(({ hideDone }) => hideDone)
+    .catch(getHideDoneError => {
+      if (getHideDoneError.status === 404) {
+        return false;
+      }
+      console.warn({ getHideDoneError });
+      return Promise.reject(getHideDoneError.message);
+    });
+}
+
+export function SaveHideDone(listId, hideDone) {
+  return HideDone.get(listId)
+    .then(({ _id, _rev }) => HideDone.put({ _id, _rev, hideDone }))
+    .catch(saveHideDoneError => {
+      if (saveHideDoneError.status === 404) {
+        return HideDone.put({ _id: listId, hideDone });
+      }
+      console.warn({ saveHideDoneError });
+      return Promise.reject(saveHideDoneError.message);
+    })
+    .catch(saveHideDoneError => {
+      console.warn({ saveHideDoneError });
+      return Promise.reject(saveHideDoneError.message);
+    });
 }
