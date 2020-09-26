@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "target": "es2015",
+        "module": "es2015",
+        "checkJs": true,
+        "moduleResolution": "node"
+    },
+    "include": [
+        "src/Mandadin.Client/wwwroot/js"
+    ],
+    "typeAcquisition": {
+        "enable": true,
+        "include": [
+            "@types/pouchdb"
+        ]
+    }
+}

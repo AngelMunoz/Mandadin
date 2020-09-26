@@ -1,6 +1,13 @@
+/**
+ * @type {PouchDB.Database<{ theme: string }>}
+ */
 const themedb = new PouchDB('theme');
 
-
+/**
+ * 
+ * @param {string} theme 
+ * @returns {Promise<boolean>}
+ */
 export function SaveTheme(theme) {
   return themedb.get("theme")
     .then(doc => themedb.put({ ...doc, theme }))
@@ -13,22 +20,24 @@ export function SaveTheme(theme) {
     });
 }
 
-
+/**
+ * @returns {Promise<Theme>}
+ */
 export function GetTheme() {
-  const result = themedb
+  return themedb
     .get("theme")
     .then(({ theme }) => theme)
     .catch(err => {
       console.warn(err);
       return "None"
     });
-  return result
 }
 
 
 /**
  * interacts with the HTML Element to switch classes
  * @param {Theme} theme
+ * @return {Promise<boolean>}
  */
 export function SwitchTheme(theme) {
   const html = document.querySelector('html');

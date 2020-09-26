@@ -4,7 +4,9 @@
  * @returns {Promise<boolean>}
  */
 export function CanShare() {
+    //@ts-ignore
     if (navigator.canShare) {
+        //@ts-ignore
         return window.navigator.canShare({
             title: '',
             text: '',

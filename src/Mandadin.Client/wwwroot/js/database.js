@@ -1,7 +1,25 @@
+/**
+ * @typedef {import('pouchdb')} PouchDB
+ */
 
+/**
+ * @type {PouchDB.Database<{ content: string }>}
+ */
 const Notes = new PouchDB("notas");
+
+/**
+ * @type {PouchDB.Database<{}>}
+ */
 const Lists = new PouchDB("lists");
+
+/**
+ * @type {PouchDB.Database<{isDone: boolean, listId: string; name: string; }>}
+ */
 const ListItems = new PouchDB("listItems");
+
+/**
+ * @type {PouchDB.Database<{ hideDone: boolean }>}
+ */
 const HideDone = new PouchDB("hideDone");
 
 
@@ -25,9 +43,8 @@ const HideDone = new PouchDB("hideDone");
       index: {
         fields: ['listId', 'name'],
         name: 'listItemNameIndex',
-        ddoc: 'mandadinddoclistitemnameindex',
-      },
-      sort: ['name']
+        ddoc: 'mandadinddoclistitemnameindex'
+      }
     });
     const createIndexesResult = await Promise.all([listIdIndex, isDoneIndex, listItemNameIndex]);
     console.log({ createIndexesResult });
@@ -37,11 +54,6 @@ const HideDone = new PouchDB("hideDone");
 })(ListItems)
 
 
-/**
- * 
- * @param {Doc<Note>} doc 
- * @returns {Note}
- */
 function mapDocument(doc) {
   console.log(doc);
   return {
@@ -51,11 +63,6 @@ function mapDocument(doc) {
   }
 }
 
-/**
- * 
- * @param {AllDocsResponse} docsResponse
- * @returns {Note[]}
- */
 function mapAllDocs({ total_rows, offset, rows }) {
   console.log({ total_rows, offset });
   console.table(rows);
@@ -68,9 +75,6 @@ function mapAllDocs({ total_rows, offset, rows }) {
   ));
 }
 
-/**
- * @returns {Promise<Note[]>}
- */
 export function FindNotes() {
   return Notes.allDocs({ include_docs: true })
     .then(mapAllDocs)
@@ -82,14 +86,12 @@ export function FindNotes() {
 
 /**
  * 
- * @param {string} Content
+ * @param {string} content
  * @returns {Promise<Note>}
  */
 export async function CreateNote(content) {
   const note = { content, _id: `${Date.now()}` }
-  /**
-   * @type {DocumentOperationResult}
-   */
+
   const createNoteResult = await Notes.put(note);
   console.log({ createNoteResult });
   return { id: createNoteResult.id, content, rev: createNoteResult.rev };
@@ -102,9 +104,6 @@ export async function CreateNote(content) {
  */
 export async function UpdateNote(note) {
   const toUpdate = { _id: note.id, _rev: note.rev, ...note, id: undefined, rev: undefined };
-  /**
-   * @type {DocumentOperationResult}
-   */
   const updateNoteResult = await Notes.put(toUpdate);
   return { ...note, rev: updateNoteResult.rev }
 }
@@ -121,7 +120,7 @@ export function FindNote(noteid) {
 /**
  * 
  * @param {string} noteid 
- * @param {string} rev 
+ * @param {string} noterev 
  * @returns {Promise<[string, string]>}
  */
 export async function DeleteNote(noteid, noterev) {
@@ -215,7 +214,7 @@ export function ImportList(name, items) {
     })
     .catch(importListError => {
       console.warn({ importListError });
-      return Promise.reject(error.message);
+      return Promise.reject(importListError.message);
     });
 }
 
@@ -283,7 +282,7 @@ function buildIndexQuery(listId, hideDone) {
 /**
  * 
  * @param {string} listId
- * @param {bool} hideDone 
+ * @param {boolean} hideDone 
  */
 export async function GetListItems(listId, hideDone) {
   try {
@@ -333,7 +332,7 @@ export async function CreateListItem(listId, name) {
 
 /**
  * 
- * @param {ListItem} item
+ * @param {ListItem & { _deleted?: boolean }} item
  * @return {Promise<ListItem>}
  */
 export async function UpdateListItem(item) {
@@ -358,7 +357,11 @@ export function DeleteListItem(item) {
     .then(item => ({ ...item, _deleted: undefined }));
 }
 
-
+/**
+ * 
+ * @param {string} listId
+ * @returns {Promise<boolean>}
+ */
 export function GetHideDone(listId) {
   return HideDone.get(listId)
     .then(({ hideDone }) => hideDone)
@@ -371,6 +374,12 @@ export function GetHideDone(listId) {
     });
 }
 
+/**
+ * 
+ * @param {string} listId 
+ * @param {boolean} hideDone 
+ * @returns {Promise<PouchDB.Core.Response>}
+ */
 export function SaveHideDone(listId, hideDone) {
   return HideDone.get(listId)
     .then(({ _id, _rev }) => HideDone.put({ _id, _rev, hideDone }))
