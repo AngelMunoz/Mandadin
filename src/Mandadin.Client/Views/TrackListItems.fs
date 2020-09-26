@@ -30,7 +30,7 @@ module ListItems =
       CanAddCurrentItem: bool
       HideDone: bool
       CanShare: bool
-      ShowConfirmDeleteModal: bool
+      ShowConfirmDeleteModal: Option<TrackListItem>
     }
 
 
@@ -58,7 +58,7 @@ module ListItems =
     | CreateItem of string
     | CreateItemSuccess of TrackListItem
 
-    | ShowConfirmDeleteModal of bool
+    | ShowConfirmDeleteModal of Option<TrackListItem>
     | ShowConfirmDeleteModalAction of TrackListItem * Result<bool, unit>
 
     | ShareRequest of list<TrackListItem>
@@ -83,7 +83,7 @@ module ListItems =
       CurrentItem = ""
       CanAddCurrentItem = false
       CanShare = canShare
-      ShowConfirmDeleteModal = false
+      ShowConfirmDeleteModal = None
     },
     Cmd.batch [ Cmd.ofMsg RequestHideDone ]
 
@@ -197,11 +197,19 @@ module ListItems =
               Error
     | UpdateItemPropSuccess item ->
         let items =
-          state.Items
-          |> List.map (fun i -> if i.Id = item.Id then item else i)
-          |> List.sortBy (fun item -> item.Name)
+          match state.HideDone, item.IsDone with
+          | true, true ->
+              state.Items
+              |> List.filter (fun i -> i.Id <> item.Id)
+          | _ ->
+              state.Items
+              |> List.map (fun i -> if i.Id = item.Id then item else i)
 
-        { state with Items = items }, Cmd.none
+
+        { state with
+            Items = items |> List.sortBy (fun item -> item.Name)
+        },
+        Cmd.none
     | ShowConfirmDeleteModal show ->
         { state with
             ShowConfirmDeleteModal = show
@@ -211,7 +219,7 @@ module ListItems =
         let cmd =
           match result with
           | Ok result when result -> Cmd.ofMsg (DeleteItem item)
-          | _ -> Cmd.ofMsg (ShowConfirmDeleteModal false)
+          | _ -> Cmd.ofMsg (ShowConfirmDeleteModal None)
 
         state, cmd
     | DeleteItem item ->
@@ -226,10 +234,11 @@ module ListItems =
         let items =
           state.Items
           |> List.filter (fun i -> i.Id <> item.Id)
+          |> List.sortBy (fun item -> item.Name)
 
         { state with
             Items = items
-            ShowConfirmDeleteModal = false
+            ShowConfirmDeleteModal = None
         },
         Cmd.none
 
@@ -295,7 +304,7 @@ module ListItems =
                 |> dispatch) ]
       button [
                attr.``class`` "paper-btn btn-small btn-danger-outline m-0"
-               on.click (fun _ -> ShowConfirmDeleteModal true |> dispatch)
+               on.click (fun _ -> ShowConfirmDeleteModal(Some item) |> dispatch)
              ] [
         Icon.Get Trash None
       ]
@@ -327,17 +336,19 @@ module ListItems =
       let txt =
         sprintf """Proceder con el borrado de "%s"?""" item.Name
 
-      Modals.DeleteResourceModal (title, subtitle, txt)
-        state.ShowConfirmDeleteModal (fun result ->
+      let showModal = state.ShowConfirmDeleteModal.IsSome
+
+      Modals.DeleteResourceModal (title, subtitle, txt) showModal (fun result ->
         ShowConfirmDeleteModalAction(item, result)
         |> dispatch)
 
     article [] [
       toolbar state dispatch
       newItemForm state dispatch
+      if state.ShowConfirmDeleteModal.IsSome
+      then deleteModal state.ShowConfirmDeleteModal.Value
       ul [ attr.``class`` "tracklist-list" ] [
         for item in state.Items do
-          deleteModal item
           listItem item dispatch
       ]
     ]

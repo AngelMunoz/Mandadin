@@ -34,7 +34,7 @@ module Lists =
       TrackLists: list<TrackList>
       CurrentListName: string
       CanAddCurrentName: bool
-      ShowConfirmDeleteModal: bool
+      ShowConfirmDeleteModal: Option<TrackList>
       ShowImportDialog: bool
       FromClipboard: Option<string>
     }
@@ -56,7 +56,7 @@ module Lists =
     | DeleteList of TrackList
     | DeleteListSuccess of TrackList
 
-    | ShowConfirmDeleteModal of bool
+    | ShowConfirmDeleteModal of Option<TrackList>
     | ShowConfirmDeleteModalAction of TrackList * Result<bool, unit>
 
     | ShowImportDialog of bool
@@ -72,7 +72,7 @@ module Lists =
       TrackLists = list.Empty
       CurrentListName = ""
       CanAddCurrentName = false
-      ShowConfirmDeleteModal = false
+      ShowConfirmDeleteModal = None
       ShowImportDialog = false
       FromClipboard = None
     },
@@ -175,7 +175,7 @@ module Lists =
         let cmd =
           match result with
           | Ok result when result -> Cmd.ofMsg (DeleteList item)
-          | _ -> Cmd.ofMsg (ShowConfirmDeleteModal false)
+          | _ -> Cmd.ofMsg (ShowConfirmDeleteModal None)
 
         state, cmd
     | DeleteList item ->
@@ -189,7 +189,7 @@ module Lists =
 
         { state with
             TrackLists = list
-            ShowConfirmDeleteModal = false
+            ShowConfirmDeleteModal = None
         },
         Cmd.none
     | Error ex ->
@@ -246,7 +246,7 @@ module Lists =
       ]
       button [
                attr.``class`` "paper-btn btn-small btn-danger-outline"
-               on.click (fun _ -> ShowConfirmDeleteModal true |> dispatch)
+               on.click (fun _ -> ShowConfirmDeleteModal(Some item) |> dispatch)
              ] [
         Icon.Get Trash None
       ]
@@ -260,8 +260,10 @@ module Lists =
       let txt =
         sprintf """Proceder con el borrado de "%s"?""" item.Id
 
-      Modals.DeleteResourceModal (title, subtitle, txt)
-        state.ShowConfirmDeleteModal (fun result ->
+      let showModal = state.ShowConfirmDeleteModal.IsSome
+
+
+      Modals.DeleteResourceModal (title, subtitle, txt) showModal (fun result ->
         ShowConfirmDeleteModalAction(item, result)
         |> dispatch)
 
@@ -271,11 +273,12 @@ module Lists =
         (ShowImportDialogAction >> dispatch)
         state.FromClipboard
       newListForm state dispatch
+      if state.ShowConfirmDeleteModal.IsSome
+      then deleteModal state.ShowConfirmDeleteModal.Value
       ul [
            attr.``class`` "tracklist-list child-borders"
          ] [
         for item in state.TrackLists do
-          deleteModal item
           listItem item dispatch
       ]
     ]
