@@ -7,6 +7,7 @@ open Bolero.Html
 open Bolero.Remoting.Client
 open Mandadin.Client
 open Microsoft.AspNetCore.Components
+open Microsoft.AspNetCore.Components.Web.Virtualization
 
 
 [<RequireQualifiedAccess>]
@@ -39,6 +40,7 @@ module ListItems =
     | Name of string
 
   type Msg =
+    | GoBack
     | SetCurrentItem of string
 
     | GetItems
@@ -87,11 +89,18 @@ module ListItems =
     },
     Cmd.batch [ Cmd.ofMsg RequestHideDone ]
 
-  let update (msg: Msg) (state: State) (js: IJSRuntime) =
+  let update (msg: Msg) (state: State) (onGoBackRequested: Option<unit -> unit>) (js: IJSRuntime) =
     let emptyListId =
       state, Cmd.ofMsg (Error(exn "ListId cannot be Empty"))
 
     match msg with
+    | GoBack ->
+      match onGoBackRequested with 
+      | Some onGoBackRequested ->
+        onGoBackRequested ()
+        state, Cmd.none
+      | None -> 
+        state, Cmd.none
     | HideDone hide ->
         { state with HideDone = hide },
         Cmd.batch [ Cmd.ofMsg GetItems
@@ -292,8 +301,8 @@ module ListItems =
       ]
     ]
 
-  let private listItem (item: TrackListItem) (dispatch: Dispatch<Msg>) =
-    li [ attr.``class`` "listitem-item" ] [
+  let private listItem (dispatch: Dispatch<Msg>) (item: TrackListItem) =
+    li [ attr.``class`` "listitem-item"; attr.key item.Id ] [
       input [ attr.``type`` "checkbox"
               attr.``class`` "listitem-item-checkbox"
               attr.id item.Id
@@ -313,19 +322,18 @@ module ListItems =
   let toolbar (state: State) (dispatch: Dispatch<Msg>) =
     let getId = defaultArg state.TrackListId ""
 
-    section [
-              attr.``class`` "border row flex-center"
-            ] [
+    section [attr.``class`` "border row flex-center" ] [
       h4 [] [
         text getId
       ]
+      button 
+        [ attr.``class`` "paper-btn btn-small"
+          on.click (fun _ -> dispatch GoBack) ] 
+        [ Icon.Get Back None ]
       if state.CanShare then
-        button [
-                 attr.``class`` "paper-btn btn-small"
-                 on.click (fun _ -> ShareRequest state.Items |> dispatch)
-               ] [
-          Icon.Get Share None
-        ]
+        button [ attr.``class`` "paper-btn btn-small"
+                 on.click (fun _ -> ShareRequest state.Items |> dispatch) ] 
+               [ Icon.Get Share None ]
     ]
 
   let view (state: State) (dispatch: Dispatch<Msg>) =
@@ -347,15 +355,20 @@ module ListItems =
       newItemForm state dispatch
       if state.ShowConfirmDeleteModal.IsSome
       then deleteModal state.ShowConfirmDeleteModal.Value
-      ul [ attr.``class`` "tracklist-list" ] [
-        for item in state.Items do
-          listItem item dispatch
+      ul [attr.``class`` "tracklist-list"] [
+        comp<Virtualize<TrackListItem>> [
+          "Items" => ResizeArray(state.Items)
+          attr.fragmentWith "ChildContent" (listItem dispatch)
+        ] []
       ]
     ]
 
 
   type Page() =
     inherit ProgramComponent<State, Msg>()
+
+    [<Parameter>]
+    member val OnBackRequested: Option<unit -> unit> = None with get, set
 
     [<Parameter>]
     member val ListId: Option<string> = None with get, set
@@ -365,7 +378,7 @@ module ListItems =
 
     override this.Program =
       let init _ = init this.ListId this.CanShare
-      let update msg state = update msg state this.JSRuntime
+      let update msg state = update msg state this.OnBackRequested this.JSRuntime
       Program.mkProgram init update view
 #if DEBUG
       |> Program.withConsoleTrace

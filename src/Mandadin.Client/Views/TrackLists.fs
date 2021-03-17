@@ -197,7 +197,6 @@ module Lists =
         state, Cmd.none
 
   let private newListForm (state: State) (dispatch: Dispatch<Msg>) =
-    let submitBtnTxt = "Guardar"
     let currentContentTxt = "Nombre de la nueva lista..."
     form [
            attr.``class`` "row flex-spaces background-muted border notes-form"
