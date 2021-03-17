@@ -6,6 +6,8 @@ self.addEventListener('install', event => event.waitUntil(onInstall(event)));
 self.addEventListener('activate', event => event.waitUntil(onActivate(event)));
 self.addEventListener('fetch', event => event.respondWith(onFetch(event)));
 
+const shareChannel = new BroadcastChannel("share-target");
+
 const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
 const offlineAssetsInclude = [ /\.dll$/, /\.pdb$/, /\.wasm/, /\.html/, /\.js$/, /\.json$/, /\.css$/, /\.woff$/, /\.png$/, /\.jpe?g$/, /\.gif$/, /\.ico$/ ];
@@ -42,6 +44,15 @@ async function onFetch(event) {
         const request = shouldServeIndexHtml ? 'index.html' : event.request;
         const cache = await caches.open(cacheName);
         cachedResponse = await cache.match(request);
+    }
+
+    if (event.request.method === 'POST' &&
+        url.pathname === '/import') {
+        const formData = await event.request.formData();
+        const title = formData.get('title') || '';
+        const text = formData.get('text') || '';
+        const url = formData.get('url') || '';
+        shareChannel.postMessage({ title, text, url });
     }
 
     return cachedResponse || fetch(event.request);
