@@ -4,6 +4,7 @@ html, body {
   margin: 0;
   background-color: var(--main-background, #41403e);
 }
+
 nav .bar1, nav .bar2, nav .bar3 {
   height: 2px;
 }
@@ -15,7 +16,7 @@ nav .bar1, nav .bar2, nav .bar3 {
 .mandadin-content {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 80px);
+  height: 100vh;
   overflow-y: auto;
 }
 .mandadin-content.with-80px-pad {
@@ -69,7 +70,6 @@ nav .bar1, nav .bar2, nav .bar3 {
   align-items: center;
   justify-content: space-around;
   margin: 1em;
-  padding: 1em;
 }
 
 @media all and (max-width: 525px) {
