@@ -1,7 +1,6 @@
 namespace Mandadin.Client
 
 open Microsoft.AspNetCore.Components.WebAssembly.Hosting
-open Bolero.Remoting.Client
 
 module Program =
 
