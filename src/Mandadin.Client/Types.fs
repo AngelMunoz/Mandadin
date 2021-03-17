@@ -46,6 +46,7 @@ type Icon =
   | Import
   | Close
   | Check
+  | Back
 
 [<RequireQualifiedAccess>]
 module Icon =
@@ -58,6 +59,7 @@ module Icon =
   type Import = Template<"wwwroot/icons/import.html">
   type Close = Template<"wwwroot/icons/close.html">
   type Check = Template<"wwwroot/icons/check.html">
+  type Back = Template<"wwwroot/icons/back.html">
 
   let Get (icon: Icon) (color: Option<string>): Node =
     let color = defaultArg color "currentColor"
@@ -71,3 +73,4 @@ module Icon =
     | Import -> Import().Fill(color).Elt()
     | Close -> Close().Fill(color).Elt()
     | Check -> Check().Fill(color).Elt()
+    | Back -> Back().Fill(color).Elt()
