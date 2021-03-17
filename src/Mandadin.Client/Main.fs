@@ -127,9 +127,14 @@ module Main =
       ]
     ]
 
+  let private navigateToList (dispatch: Dispatch<Msg>) (route: string) =
+    View.ListDetail route |> SetView |> dispatch
+
+  let private goBack (dispatch: Dispatch<Msg>) () =
+    SetView View.Lists |> dispatch
+
   let private view (state: State) (dispatch: Dispatch<Msg>): Node =
-    let navigateToList (route: string) =
-      View.ListDetail route |> SetView |> dispatch
+    
 
     let isNotesOrLists =
       state.View = View.Lists || state.View = View.Notes
@@ -149,7 +154,7 @@ module Main =
         | View.Lists ->
             comp<Views.Lists.Page>
               [
-                "OnRouteRequested" => Some(navigateToList)
+                "OnRouteRequested" => Some(navigateToList dispatch)
               ]
               []
         | View.ListDetail listId ->
@@ -157,6 +162,7 @@ module Main =
               [
                 "ListId" => Some listId
                 "CanShare" => state.CanShare
+                "OnBackRequested" => Some (goBack dispatch)
               ]
               []
       ]
