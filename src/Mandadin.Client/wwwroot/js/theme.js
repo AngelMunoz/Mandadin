@@ -14,6 +14,12 @@ export function SaveTheme(theme) {
     .then(({ ok }) => ok)
     .catch(({ status, ...error }) => {
       if (status === 404) {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          return themedb.put({ _id: "theme", theme: "Dark" }).then(({ ok }) => ok);
+        }
+        if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+          return themedb.put({ _id: "theme", theme: "Light" }).then(({ ok }) => ok);
+        }
         return themedb.put({ _id: "theme", theme }).then(({ ok }) => ok);
       }
       return false;
@@ -28,7 +34,12 @@ export function GetTheme() {
     .get("theme")
     .then(({ theme }) => theme)
     .catch(err => {
-      console.warn(err);
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return themedb.put({ _id: "theme", theme: "Dark" }).then(({ ok }) => "Dark");
+      }
+      if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+        return themedb.put({ _id: "theme", theme: "Light" }).then(({ ok }) => "Light");
+      }
       return "None"
     });
 }
