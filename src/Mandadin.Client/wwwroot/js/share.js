@@ -1,3 +1,4 @@
+const channel = new BroadcastChannel("share-target");
 
 
 /**
@@ -28,4 +29,34 @@ export function ShareContent(title, text, url = undefined) {
         return navigator.share({ title, text, url });
     }
     return Promise.reject('Share API not available');
+}
+
+channel.onmessage = function(event) {
+    const isAllowed =
+        ["SEND_IMPORT_DATA"].includes(event.data.type);
+
+    if (event.data && !isAllowed || (!event.data && !event.data.data)) {
+        return;
+    }
+    const data = event.data.data;
+    if (data && data.text) {
+        sessionStorage.setItem("import", JSON.stringify({
+            title: data.title,
+            text: data.text,
+            url: ""
+        }));
+    }
+}
+
+const delay = time => new Promise(resolve => setTimeout(() => resolve(), time))
+
+export async function ImportShareData() {
+    channel.postMessage({ type: "GET_IMPORT_DATA" })
+    await delay(500);
+    try {
+        return JSON.parse(sessionStorage.getItem("import"));
+    } catch (e) {
+        console.error(e);
+        return { text: '', title: '', url: '' }
+    }
 }

@@ -6,11 +6,13 @@ open Bolero.Html
 module Modals =
 
 
-  let DeleteResourceModal (content: string * string * string)
-                          (isOpen: bool)
-                          (action: Result<bool, unit> -> unit)
-                          =
+  let DeleteResourceModal
+    (content: string * string * string)
+    (isOpen: bool)
+    (action: Result<bool, unit> -> unit)
+    =
     let (title, subtitle, message) = content
+
     section [] [
       input [ attr.``class`` "modal-state"
               attr.id "modal-1"
@@ -19,10 +21,8 @@ module Modals =
       div [ attr.``class`` "modal" ] [
         label [ attr.``class`` "modal-bg" ] []
         div [ attr.``class`` "modal-body" ] [
-          label [
-                  attr.``class`` "btn-close"
-                  on.click (fun _ -> Error() |> action)
-                ] [
+          label [ attr.``class`` "btn-close"
+                  on.click (fun _ -> Error() |> action) ] [
             Icon.Get Close None
           ]
           h4 [ attr.``class`` "modal-title" ] [
@@ -34,17 +34,13 @@ module Modals =
           p [ attr.``class`` "modal-text" ] [
             text message
           ]
-          button [
-                   attr.``class`` "paper-btn btn-danger-outline"
-                   on.click (fun _ -> Ok true |> action)
-                 ] [
+          button [ attr.``class`` "paper-btn btn-danger-outline"
+                   on.click (fun _ -> Ok true |> action) ] [
             Icon.Get Check None
             text "Si, Continuar"
           ]
-          button [
-                   attr.``class`` "paper-btn btn-success-outline"
-                   on.click (fun _ -> Ok false |> action)
-                 ] [
+          button [ attr.``class`` "paper-btn btn-success-outline"
+                   on.click (fun _ -> Ok false |> action) ] [
             Icon.Get Trash None
             text "Cancelar"
           ]
@@ -52,12 +48,15 @@ module Modals =
       ]
     ]
 
-  let ImportTrackList (isOpen: bool)
-                      (action: Result<string * string, unit> -> unit)
-                      (fromClipboard: Option<string>)
-                      =
-    let mutable title = ""
-    let mutable content = defaultArg fromClipboard ""
+  let ImportTrackList
+    (isOpen: bool)
+    (action: Result<string * string, unit> -> unit)
+    (title: Option<string>)
+    (content: Option<string>)
+    =
+    let mutable title = defaultArg title ""
+    let mutable content = defaultArg content ""
+
     section [] [
       input [ attr.``class`` "modal-state"
               attr.id "modal-1"
@@ -66,10 +65,8 @@ module Modals =
       div [ attr.``class`` "modal" ] [
         label [ attr.``class`` "modal-bg" ] []
         div [ attr.``class`` "modal-body" ] [
-          label [
-                  attr.``class`` "btn-close"
-                  on.click (fun _ -> Error() |> action)
-                ] [
+          label [ attr.``class`` "btn-close"
+                  on.click (fun _ -> Error() |> action) ] [
             Icon.Get Close None
           ]
           h4 [ attr.``class`` "modal-title" ] [
@@ -82,22 +79,16 @@ module Modals =
             text
               "NOTA: SI EL NOMBRE ES IGUAL A UNO EXISTENTE SE BORRARA EL CONTENIDO ANTERIOR"
           ]
-          textarea [
-                     attr.``class`` "modal-text"
+          textarea [ attr.``class`` "modal-text"
                      attr.rows 6
-                     bind.input.string content (fun txt -> content <- txt)
-                   ] []
-          button [
-                   attr.``class`` "paper-btn btn-info-outline"
-                   on.click (fun _ -> Ok(title, content) |> action)
-                 ] [
+                     bind.input.string content (fun txt -> content <- txt) ] []
+          button [ attr.``class`` "paper-btn btn-info-outline"
+                   on.click (fun _ -> Ok(title, content) |> action) ] [
             Icon.Get Check None
             text "Importar contenido"
           ]
-          button [
-                   attr.``class`` "paper-btn btn-danger-outline"
-                   on.click (fun _ -> Error() |> action)
-                 ] [
+          button [ attr.``class`` "paper-btn btn-danger-outline"
+                   on.click (fun _ -> Error() |> action) ] [
             Icon.Get Trash None
             text "Cancelar"
           ]

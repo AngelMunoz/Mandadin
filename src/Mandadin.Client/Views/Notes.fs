@@ -12,11 +12,9 @@ open Microsoft.AspNetCore.Components
 module Notes =
 
   type State =
-    {
-      CurrentContent: string
+    { CurrentContent: string
       Notes: list<Note>
-      CanShare: bool
-    }
+      CanShare: bool }
 
   type Msg =
     | SetCurrentContent of string
@@ -47,11 +45,9 @@ module Notes =
     | Error of exn
 
   let private init (canShare: bool) =
-    {
-      CurrentContent = ""
+    { CurrentContent = ""
       Notes = list.Empty
-      CanShare = canShare
-    },
+      CanShare = canShare },
     Cmd.ofMsg GetNotes
 
   let private update (msg: Msg) (state: State) (js: IJSRuntime) =
@@ -84,8 +80,7 @@ module Notes =
           Error
     | GetNotesSuccess notes ->
         { state with
-            Notes = notes |> List.ofSeq
-        },
+            Notes = notes |> List.ofSeq },
         Cmd.none
     | CreateNote content ->
         state,
@@ -97,8 +92,7 @@ module Notes =
           Error
     | CreateNoteSuccess note ->
         { state with
-            Notes = note :: state.Notes
-        },
+            Notes = note :: state.Notes },
         Cmd.none
     | UpdateNote note ->
         state,
@@ -111,13 +105,16 @@ module Notes =
     | UpdateNoteSuccess updated ->
         let notes =
           state.Notes
-          |> List.map (fun note ->
-               if note.Id = updated.Id then updated else note)
+          |> List.map
+               (fun note ->
+                 if note.Id = updated.Id then
+                   updated
+                 else
+                   note)
 
         { state with
             Notes = notes
-            CurrentContent = ""
-        },
+            CurrentContent = "" },
         Cmd.none
     | FromClipboard ->
         state,
@@ -134,15 +131,24 @@ module Notes =
           sprintf "Nota Mandadin:\n%s " note.Content
 
         state,
-        Cmd.OfJS.either js "Mandadin.Clipboard.CopyTextToClipboard" [| text |] (fun _ ->
-          ToClipboardSuccess) Error
+        Cmd.OfJS.either
+          js
+          "Mandadin.Clipboard.CopyTextToClipboard"
+          [| text |]
+          (fun _ -> ToClipboardSuccess)
+          Error
     | ToClipboardSuccess -> state, Cmd.none
     | ShareContent note ->
         let title = "Nota"
         let text = sprintf "%s" note.Content
+
         state,
-        Cmd.OfJS.either js "Mandadin.Share.ShareContent" [| title; text; "" |] (fun _ ->
-          ShareContentSuccess) Error
+        Cmd.OfJS.either
+          js
+          "Mandadin.Share.ShareContent"
+          [| title; text; "" |]
+          (fun _ -> ShareContentSuccess)
+          Error
     | ShareContentSuccess -> state, Cmd.none
     | Error err ->
         eprintfn "%s" err.Message
@@ -151,60 +157,47 @@ module Notes =
   let private newNoteForm (state: State) (dispatch: Dispatch<Msg>) =
     let submitBtnTxt = "Guardar"
     let currentContentTxt = "Escribe algo..."
-    form [
-           attr.``class`` "row flex-spaces background-muted border notes-form"
-           on.submit (fun _ -> CreateNote(state.CurrentContent) |> dispatch)
-         ] [
+
+    form [ attr.``class`` "row flex-spaces background-muted border notes-form"
+           on.submit (fun _ -> CreateNote(state.CurrentContent) |> dispatch) ] [
       fieldset [ attr.``class`` "form-group" ] [
         label [ attr.``for`` "current-content" ] [
           text currentContentTxt
         ]
-        textarea [
-                   attr.id "current-content"
+        textarea [ attr.id "current-content"
                    attr.placeholder currentContentTxt
                    bind.input.string
                      state.CurrentContent
-                     (SetCurrentContent >> dispatch)
-                 ] []
+                     (SetCurrentContent >> dispatch) ] []
       ]
-      button [
-               attr.``type`` "submit"
-               attr.disabled (state.CurrentContent.Length = 0)
-             ] [
+      button [ attr.``type`` "submit"
+               attr.disabled (state.CurrentContent.Length = 0) ] [
         Icon.Get Save None
       ]
-      button [
-               attr.``type`` "button"
-               on.click (fun _ -> FromClipboard |> dispatch)
-             ] [
+      button [ attr.``type`` "button"
+               on.click (fun _ -> FromClipboard |> dispatch) ] [
         Icon.Get Clipboard None
       ]
     ]
 
   let private noteItem (item: Note) (canShare: bool) (dispatch: Dispatch<Msg>) =
     li [ attr.``class`` "note-list-item m-05" ] [
-      textarea [
-                 bind.input.string item.Content (fun text ->
-                   dispatch (UpdateNote { item with Content = text }))
-               ] []
+      textarea [ bind.input.string
+                   item.Content
+                   (fun text ->
+                     dispatch (UpdateNote { item with Content = text })) ] []
       section [ attr.``class`` "row" ] [
-        button [
-                 attr.``class`` "paper-btn btn-small btn-muted-outline"
-                 on.click (fun _ -> ToClipboard item |> dispatch)
-               ] [
+        button [ attr.``class`` "paper-btn btn-small btn-muted-outline"
+                 on.click (fun _ -> ToClipboard item |> dispatch) ] [
           (Icon.Get Copy None)
         ]
         if canShare then
-          button [
-                   attr.``class`` "paper-btn btn-small btn-muted-outline"
-                   on.click (fun _ -> ShareContent item |> dispatch)
-                 ] [
+          button [ attr.``class`` "paper-btn btn-small btn-muted-outline"
+                   on.click (fun _ -> ShareContent item |> dispatch) ] [
             Icon.Get Share None
           ]
-        button [
-                 attr.``class`` "paper-btn btn-small btn-danger-outline"
-                 on.click (fun _ -> DeleteNote(item.Id, item.Rev) |> dispatch)
-               ] [
+        button [ attr.``class`` "paper-btn btn-small btn-danger-outline"
+                 on.click (fun _ -> DeleteNote(item.Id, item.Rev) |> dispatch) ] [
           Icon.Get Trash None
         ]
       ]

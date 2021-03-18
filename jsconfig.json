@@ -1,9 +1,13 @@
 {
     "compilerOptions": {
-        "target": "es2015",
+        "target": "es2017",
         "module": "es2015",
         "checkJs": true,
-        "moduleResolution": "node"
+        "moduleResolution": "node",
+        "baseUrl": "./src/Mandadin.Client",
+        "paths": {
+          "/*": ["wwwroot/*"]
+        }
     },
     "include": [
         "src/Mandadin.Client/wwwroot/js"

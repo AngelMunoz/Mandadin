@@ -12,27 +12,25 @@ open Microsoft.AspNetCore.Components.Web.Virtualization
 
 [<RequireQualifiedAccess>]
 module ListItems =
-  let stringifyItems (items: list<TrackListItem>): string =
+  let stringifyItems (items: list<TrackListItem>) : string =
     let isDoneToX (isDone: bool) = if isDone then 'x' else ' '
 
     let stringified =
       items
       |> Array.ofList
-      |> Array.Parallel.map (fun item ->
-           sprintf "[ %c ] %s" (isDoneToX item.IsDone) item.Name)
+      |> Array.Parallel.map
+           (fun item -> sprintf "[ %c ] %s" (isDoneToX item.IsDone) item.Name)
 
     System.String.Join('\n', stringified)
 
   type State =
-    {
-      Items: list<TrackListItem>
+    { Items: list<TrackListItem>
       TrackListId: Option<string>
       CurrentItem: string
       CanAddCurrentItem: bool
       HideDone: bool
       CanShare: bool
-      ShowConfirmDeleteModal: Option<TrackListItem>
-    }
+      ShowConfirmDeleteModal: Option<TrackListItem> }
 
 
   type UpdatableItemProp =
@@ -78,29 +76,31 @@ module ListItems =
 
 
   let init (listId: Option<string>) (canShare: bool) =
-    {
-      Items = []
+    { Items = []
       TrackListId = listId
       HideDone = false
       CurrentItem = ""
       CanAddCurrentItem = false
       CanShare = canShare
-      ShowConfirmDeleteModal = None
-    },
+      ShowConfirmDeleteModal = None },
     Cmd.batch [ Cmd.ofMsg RequestHideDone ]
 
-  let update (msg: Msg) (state: State) (onGoBackRequested: Option<unit -> unit>) (js: IJSRuntime) =
+  let update
+    (msg: Msg)
+    (state: State)
+    (onGoBackRequested: Option<unit -> unit>)
+    (js: IJSRuntime)
+    =
     let emptyListId =
       state, Cmd.ofMsg (Error(exn "ListId cannot be Empty"))
 
     match msg with
     | GoBack ->
-      match onGoBackRequested with 
-      | Some onGoBackRequested ->
-        onGoBackRequested ()
-        state, Cmd.none
-      | None -> 
-        state, Cmd.none
+        match onGoBackRequested with
+        | Some onGoBackRequested ->
+            onGoBackRequested ()
+            state, Cmd.none
+        | None -> state, Cmd.none
     | HideDone hide ->
         { state with HideDone = hide },
         Cmd.batch [ Cmd.ofMsg GetItems
@@ -109,16 +109,26 @@ module ListItems =
         { state with CurrentItem = item }, Cmd.ofMsg (ValidateItem(item))
     | RequestHideDone ->
         let listId = defaultArg state.TrackListId "X"
+
         state,
-        Cmd.OfJS.either js "Mandadin.Database.GetHideDone" [| listId |]
-          RequestHideDoneSuccess (fun _ -> GetItems)
+        Cmd.OfJS.either
+          js
+          "Mandadin.Database.GetHideDone"
+          [| listId |]
+          RequestHideDoneSuccess
+          (fun _ -> GetItems)
     | RequestHideDoneSuccess hideDone ->
         { state with HideDone = hideDone }, Cmd.ofMsg GetItems
     | SaveHideDone ->
         let listId = defaultArg state.TrackListId "X"
+
         state,
-        Cmd.OfJS.either js "Mandadin.Database.SaveHideDone"
-          [| listId; state.HideDone |] (fun _ -> SaveHideDoneSuccess) Error
+        Cmd.OfJS.either
+          js
+          "Mandadin.Database.SaveHideDone"
+          [| listId; state.HideDone |]
+          (fun _ -> SaveHideDoneSuccess)
+          Error
     | SaveHideDoneSuccess -> state, Cmd.none
     | GetItems ->
         match state.TrackListId with
@@ -136,13 +146,13 @@ module ListItems =
             Items =
               list
               |> Seq.sortBy (fun item -> item.Name)
-              |> List.ofSeq
-        },
+              |> List.ofSeq },
         Cmd.none
     | ValidateItem item ->
         match state.TrackListId with
         | Some listid ->
             let onSuccess nameExists = ValidateItemSuccess(nameExists, item)
+
             state,
             Cmd.OfJS.either
               js
@@ -153,9 +163,9 @@ module ListItems =
         | None -> emptyListId
     | ValidateItemSuccess (nameExists, itemName) ->
         let canAdd = not nameExists && itemName.Length <> 0
+
         { state with
-            CanAddCurrentItem = canAdd
-        },
+            CanAddCurrentItem = canAdd },
         Cmd.none
 
     | CreateItem item ->
@@ -173,8 +183,7 @@ module ListItems =
         { state with
             Items =
               (item :: state.Items)
-              |> List.sortBy (fun item -> item.Name)
-        },
+              |> List.sortBy (fun item -> item.Name) },
         Cmd.none
     | UpdateItemProp (item, prop) ->
         match prop with
@@ -190,9 +199,12 @@ module ListItems =
             state, Cmd.ofMsg (ValidateExisting { item with Name = name })
     | ValidateExisting item ->
         state,
-        Cmd.OfJS.either js "Mandadin.Database.ListItemExists"
-          [| item.ListId; item.Name |] (fun exists ->
-          ValidateExistingSuccess(exists, item)) Error
+        Cmd.OfJS.either
+          js
+          "Mandadin.Database.ListItemExists"
+          [| item.ListId; item.Name |]
+          (fun exists -> ValidateExistingSuccess(exists, item))
+          Error
     | ValidateExistingSuccess (exists, item) ->
         match exists with
         | true -> state, Cmd.none
@@ -216,13 +228,11 @@ module ListItems =
 
 
         { state with
-            Items = items |> List.sortBy (fun item -> item.Name)
-        },
+            Items = items |> List.sortBy (fun item -> item.Name) },
         Cmd.none
     | ShowConfirmDeleteModal show ->
         { state with
-            ShowConfirmDeleteModal = show
-        },
+            ShowConfirmDeleteModal = show },
         Cmd.none
     | ShowConfirmDeleteModalAction (item, result) ->
         let cmd =
@@ -247,16 +257,20 @@ module ListItems =
 
         { state with
             Items = items
-            ShowConfirmDeleteModal = None
-        },
+            ShowConfirmDeleteModal = None },
         Cmd.none
 
     | ShareRequest items ->
         let stringified = stringifyItems items
         let idValue = defaultArg state.TrackListId "Mandadin"
+
         state,
-        Cmd.OfJS.either js "Mandadin.Share.ShareContent"
-          [| idValue; stringified |] (fun _ -> ShareRequestSuccess) Error
+        Cmd.OfJS.either
+          js
+          "Mandadin.Share.ShareContent"
+          [| idValue; stringified |]
+          (fun _ -> ShareRequestSuccess)
+          Error
     | ShareRequestSuccess -> state, Cmd.none
     | Error ex ->
         eprintfn "Update Error [%s]" ex.Message
@@ -264,25 +278,20 @@ module ListItems =
 
   let private newItemForm (state: State) (dispatch: Dispatch<Msg>) =
     let currentContentTxt = "Nombre del objeto..."
-    form [
-           attr.``class`` "row flex-spaces background-muted border notes-form"
-           on.submit (fun _ -> CreateItem state.CurrentItem |> dispatch)
-         ] [
+
+    form [ attr.``class`` "row flex-spaces background-muted border notes-form"
+           on.submit (fun _ -> CreateItem state.CurrentItem |> dispatch) ] [
       fieldset [ attr.``class`` "form-group" ] [
         label [ attr.``for`` "current-content" ] [
           text currentContentTxt
         ]
-        textarea [
-                   attr.id "current-content"
+        textarea [ attr.id "current-content"
                    attr.placeholder currentContentTxt
                    bind.input.string
                      state.CurrentItem
-                     (SetCurrentItem >> dispatch)
-                 ] []
-        label [
-                attr.``for`` "paperCheck1"
-                attr.``class`` "paper-check"
-              ] [
+                     (SetCurrentItem >> dispatch) ] []
+        label [ attr.``for`` "paperCheck1"
+                attr.``class`` "paper-check" ] [
           input [ attr.id "paperCheck1"
                   attr.name "paperChecks"
                   attr.``type`` "checkbox"
@@ -292,29 +301,30 @@ module ListItems =
           ]
         ]
       ]
-      button [
-               attr.``type`` "submit"
+      button [ attr.``type`` "submit"
                attr.``class`` "paper-btn btn-small"
-               attr.disabled (not state.CanAddCurrentItem)
-             ] [
+               attr.disabled (not state.CanAddCurrentItem) ] [
         Icon.Get Save None
       ]
     ]
 
   let private listItem (dispatch: Dispatch<Msg>) (item: TrackListItem) =
-    li [ attr.``class`` "listitem-item"; attr.key item.Id ] [
+    li [ attr.``class`` "listitem-item"
+         attr.key item.Id ] [
       input [ attr.``type`` "checkbox"
               attr.``class`` "listitem-item-checkbox"
               attr.id item.Id
-              bind.``checked`` item.IsDone (fun isDone ->
-                UpdateItemProp(item, (IsDone isDone)) |> dispatch) ]
-      input [ bind.input.string item.Name (fun name ->
-                ValidateExisting { item with Name = name }
-                |> dispatch) ]
-      button [
-               attr.``class`` "paper-btn btn-small btn-danger-outline m-0"
-               on.click (fun _ -> ShowConfirmDeleteModal(Some item) |> dispatch)
-             ] [
+              bind.``checked``
+                item.IsDone
+                (fun isDone ->
+                  UpdateItemProp(item, (IsDone isDone)) |> dispatch) ]
+      input [ bind.input.string
+                item.Name
+                (fun name ->
+                  ValidateExisting { item with Name = name }
+                  |> dispatch) ]
+      button [ attr.``class`` "paper-btn btn-small btn-danger-outline m-0"
+               on.click (fun _ -> ShowConfirmDeleteModal(Some item) |> dispatch) ] [
         Icon.Get Trash None
       ]
     ]
@@ -322,18 +332,17 @@ module ListItems =
   let toolbar (state: State) (dispatch: Dispatch<Msg>) =
     let getId = defaultArg state.TrackListId ""
 
-    section [attr.``class`` "border row flex-center" ] [
-      h4 [] [
-        text getId
+    section [ attr.``class`` "border row flex-center" ] [
+      h4 [] [ text getId ]
+      button [ attr.``class`` "paper-btn btn-small"
+               on.click (fun _ -> dispatch GoBack) ] [
+        Icon.Get Back None
       ]
-      button 
-        [ attr.``class`` "paper-btn btn-small"
-          on.click (fun _ -> dispatch GoBack) ] 
-        [ Icon.Get Back None ]
       if state.CanShare then
         button [ attr.``class`` "paper-btn btn-small"
-                 on.click (fun _ -> ShareRequest state.Items |> dispatch) ] 
-               [ Icon.Get Share None ]
+                 on.click (fun _ -> ShareRequest state.Items |> dispatch) ] [
+          Icon.Get Share None
+        ]
     ]
 
   let view (state: State) (dispatch: Dispatch<Msg>) =
@@ -346,20 +355,23 @@ module ListItems =
 
       let showModal = state.ShowConfirmDeleteModal.IsSome
 
-      Modals.DeleteResourceModal (title, subtitle, txt) showModal (fun result ->
-        ShowConfirmDeleteModalAction(item, result)
-        |> dispatch)
+      Modals.DeleteResourceModal
+        (title, subtitle, txt)
+        showModal
+        (fun result ->
+          ShowConfirmDeleteModalAction(item, result)
+          |> dispatch)
 
     article [] [
       toolbar state dispatch
       newItemForm state dispatch
-      if state.ShowConfirmDeleteModal.IsSome
-      then deleteModal state.ShowConfirmDeleteModal.Value
-      ul [attr.``class`` "tracklist-list"] [
-        comp<Virtualize<TrackListItem>> [
-          "Items" => ResizeArray(state.Items)
-          attr.fragmentWith "ChildContent" (listItem dispatch)
-        ] []
+      if state.ShowConfirmDeleteModal.IsSome then
+        deleteModal state.ShowConfirmDeleteModal.Value
+      ul [ attr.``class`` "tracklist-list" ] [
+        comp<Virtualize<TrackListItem>>
+          [ "Items" => ResizeArray(state.Items)
+            attr.fragmentWith "ChildContent" (listItem dispatch) ]
+          []
       ]
     ]
 
@@ -378,7 +390,10 @@ module ListItems =
 
     override this.Program =
       let init _ = init this.ListId this.CanShare
-      let update msg state = update msg state this.OnBackRequested this.JSRuntime
+
+      let update msg state =
+        update msg state this.OnBackRequested this.JSRuntime
+
       Program.mkProgram init update view
 #if DEBUG
       |> Program.withConsoleTrace

@@ -8,6 +8,7 @@ type View =
   | [<EndPoint "/">] Notes
   | [<EndPoint "/lists">] Lists
   | [<EndPoint "lists/{listId}">] ListDetail of listId: string
+  | [<EndPoint "/import">] Import
 
 [<RequireQualifiedAccess>]
 type Theme =
@@ -18,23 +19,19 @@ type Theme =
 type SaveResult = { Id: string; Ok: bool; Rev: string }
 
 type Note =
-  {
-    Id: string
+  { Id: string
     Content: string
-    Rev: string
-  }
+    Rev: string }
 
 
 type TrackList = { Id: string; Rev: string }
 
 type TrackListItem =
-  {
-    Id: string
+  { Id: string
     IsDone: bool
     ListId: string
     Name: string
-    Rev: string
-  }
+    Rev: string }
 
 type Icon =
   | Copy
@@ -61,8 +58,9 @@ module Icon =
   type Check = Template<"wwwroot/icons/check.html">
   type Back = Template<"wwwroot/icons/back.html">
 
-  let Get (icon: Icon) (color: Option<string>): Node =
+  let Get (icon: Icon) (color: Option<string>) : Node =
     let color = defaultArg color "currentColor"
+
     match icon with
     | Copy -> Copy().Fill(color).Elt()
     | Share -> Share().Fill(color).Elt()

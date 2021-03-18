@@ -10,11 +10,9 @@ open Bolero.Remoting.Client
 module Main =
 
   type State =
-    {
-      View: View
+    { View: View
       Theme: Theme
-      CanShare: bool
-    }
+      CanShare: bool }
 
   type Msg =
     | SetView of View
@@ -26,16 +24,18 @@ module Main =
     | CanShareSuccess of bool
     | Error of exn
 
-  let private init (_: 'arg): State * Cmd<Msg> =
-    {
-      View = View.Notes
+  let private init (_: 'arg) : State * Cmd<Msg> =
+    { View = View.Notes
       Theme = Theme.Dark
-      CanShare = false
-    },
+      CanShare = false },
     Cmd.batch [ Cmd.ofMsg GetTheme
                 Cmd.ofMsg CanShare ]
 
-  let private update (msg: Msg) (state: State) (js: IJSRuntime): State * Cmd<Msg> =
+  let private update
+    (msg: Msg)
+    (state: State)
+    (js: IJSRuntime)
+    : State * Cmd<Msg> =
     match msg with
     | SetView view -> { state with View = view }, Cmd.none
     | TryChangeTheme theme ->
@@ -45,12 +45,17 @@ module Main =
           | _ -> "Light"
 
         state,
-        Cmd.OfJS.either js "Mandadin.Theme.SwitchTheme" [| jsThemeArg |] (fun didChange ->
-          ChangeThemeSuccess(didChange, theme)) Error
+        Cmd.OfJS.either
+          js
+          "Mandadin.Theme.SwitchTheme"
+          [| jsThemeArg |]
+          (fun didChange -> ChangeThemeSuccess(didChange, theme))
+          Error
     | ChangeThemeSuccess (didChange, theme) ->
-        if didChange
-        then { state with Theme = theme }, Cmd.none
-        else state, Cmd.ofMsg (Error(exn "Failed to change theme"))
+        if didChange then
+          { state with Theme = theme }, Cmd.none
+        else
+          state, Cmd.ofMsg (Error(exn "Failed to change theme"))
     | GetTheme ->
         state,
         Cmd.OfJS.either js "Mandadin.Theme.GetTheme" [||] GetThemeSuccess Error
@@ -78,9 +83,7 @@ module Main =
   let private router = Router.infer SetView (fun m -> m.View)
 
   let private navbar (state: State) (dispatch: Dispatch<Msg>) =
-    nav [
-          attr.``class`` "border fixed split-nav"
-        ] [
+    nav [ attr.``class`` "border fixed split-nav" ] [
       section [ attr.``class`` "nav-brand" ] [
         h3 [] [
           a [ router.HRef View.Notes ] [
@@ -108,19 +111,22 @@ module Main =
                 text "Listas"
               ]
             ]
-            li [
-                 attr.``class`` "cursor pointer"
-                 on.click (fun _ ->
-                   TryChangeTheme
-                     (if state.Theme = Theme.Dark then
-                       Theme.Light
-                      else
-                        Theme.Dark)
-                   |> dispatch)
-               ] [
+            li [ attr.``class`` "cursor pointer"
+                 on.click
+                   (fun _ ->
+                     TryChangeTheme(
+                       if state.Theme = Theme.Dark then
+                         Theme.Light
+                       else
+                         Theme.Dark
+                     )
+                     |> dispatch) ] [
               textf
                 "Tema %s"
-                (if state.Theme = Theme.Dark then "Claro" else "Oscuro")
+                (if state.Theme = Theme.Dark then
+                   "Claro"
+                 else
+                   "Oscuro")
             ]
           ]
         ]
@@ -133,42 +139,42 @@ module Main =
   let private goBack (dispatch: Dispatch<Msg>) () =
     SetView View.Lists |> dispatch
 
-  let private view (state: State) (dispatch: Dispatch<Msg>): Node =
-    
+  let private view (state: State) (dispatch: Dispatch<Msg>) : Node =
+
 
     let isNotesOrLists =
       state.View = View.Lists || state.View = View.Notes
 
-    let paddedClass addPadd = if addPadd then " with-80px-pad" else ""
-    article [
-              attr.``class``
-                (sprintf "mandadin-content%s" (paddedClass isNotesOrLists))
-            ] [
-      if isNotesOrLists then navbar state dispatch
-      main [
-             attr.``class`` "paper container mandadin-main"
-           ] [
+    let paddedClass addPadd =
+      if addPadd then " with-80px-pad" else ""
+
+    article [ attr.``class`` (
+                sprintf "mandadin-content%s" (paddedClass isNotesOrLists)
+              ) ] [
+      if isNotesOrLists then
+        navbar state dispatch
+      main [ attr.``class`` "paper container mandadin-main" ] [
         match state.View with
+        | View.Import ->
+            comp<Views.Import.Page>
+              [ "OnGoToListRequested"
+                => Some(navigateToList dispatch) ]
+              []
         | View.Notes ->
             comp<Views.Notes.Page> [ "CanShare" => state.CanShare ] []
         | View.Lists ->
             comp<Views.Lists.Page>
-              [
-                "OnRouteRequested" => Some(navigateToList dispatch)
-              ]
+              [ "OnRouteRequested"
+                => Some(navigateToList dispatch) ]
               []
         | View.ListDetail listId ->
             comp<Views.ListItems.Page>
-              [
-                "ListId" => Some listId
+              [ "ListId" => Some listId
                 "CanShare" => state.CanShare
-                "OnBackRequested" => Some (goBack dispatch)
-              ]
+                "OnBackRequested" => Some(goBack dispatch) ]
               []
       ]
-      footer [
-               attr.``class`` "paper row flex-spaces mandadin-footer"
-             ] [
+      footer [ attr.``class`` "paper row flex-spaces mandadin-footer" ] [
         p [] [
           text "\u00A9 Tunaxor Apps 2020"
         ]

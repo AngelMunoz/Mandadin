@@ -6,12 +6,25 @@ self.addEventListener('install', event => event.waitUntil(onInstall(event)));
 self.addEventListener('activate', event => event.waitUntil(onActivate(event)));
 self.addEventListener('fetch', event => event.respondWith(onFetch(event)));
 
+var importData;
 const shareChannel = new BroadcastChannel("share-target");
 
 const cacheNamePrefix = 'offline-cache-';
 const cacheName = `${cacheNamePrefix}${self.assetsManifest.version}`;
-const offlineAssetsInclude = [ /\.dll$/, /\.pdb$/, /\.wasm/, /\.html/, /\.js$/, /\.json$/, /\.css$/, /\.woff$/, /\.png$/, /\.jpe?g$/, /\.gif$/, /\.ico$/ ];
-const offlineAssetsExclude = [ /^service-worker\.js$/ ];
+const offlineAssetsInclude = [/\.dll$/, /\.pdb$/, /\.wasm/, /\.html/, /\.js$/, /\.json$/, /\.css$/, /\.woff$/, /\.png$/, /\.jpe?g$/, /\.gif$/, /\.ico$/];
+const offlineAssetsExclude = [/^service-worker\.js$/];
+
+shareChannel.addEventListener("message", function (event) {
+    if (event.data && event.data.type === 'GET_IMPORT_DATA' && importData) {
+        shareChannel.postMessage({
+            type: "SEND_IMPORT_DATA",
+            data: { ...importData }
+        });
+    }
+    if (event.data && event.data.type === 'REMOVE_IMPORT_DATA' && importData) {
+        importData = null;
+    }
+});
 
 async function onInstall(event) {
     console.info('Service worker: Install');
@@ -36,6 +49,8 @@ async function onActivate(event) {
 
 async function onFetch(event) {
     let cachedResponse = null;
+    const url = new URL(event.request.url);
+
     if (event.request.method === 'GET') {
         // For all navigation requests, try to serve index.html from cache
         // If you need some URLs to be server-rendered, edit the following check to exclude those URLs
@@ -48,11 +63,16 @@ async function onFetch(event) {
 
     if (event.request.method === 'POST' &&
         url.pathname === '/import') {
-        const formData = await event.request.formData();
-        const title = formData.get('title') || '';
-        const text = formData.get('text') || '';
-        const url = formData.get('url') || '';
-        shareChannel.postMessage({ title, text, url });
+        try {
+            const formData = await event.request.formData();
+            const title = formData.get('title') || '';
+            const text = formData.get('text') || '';
+            const url = formData.get('url') || '';
+            importData = { title, text, url };
+            return Response.redirect("/import", 303);
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     return cachedResponse || fetch(event.request);
