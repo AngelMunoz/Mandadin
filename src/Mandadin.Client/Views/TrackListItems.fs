@@ -64,6 +64,9 @@ module ListItems =
     | ShareRequest of list<TrackListItem>
     | ShareRequestSuccess
 
+    | ToClipboard of list<TrackListItem>
+    | ToClipboardSuccess
+
     | RequestHideDone
     | RequestHideDoneSuccess of bool
 
@@ -272,6 +275,17 @@ module ListItems =
           (fun _ -> ShareRequestSuccess)
           Error
     | ShareRequestSuccess -> state, Cmd.none
+    | ToClipboard items ->
+        let stringified = stringifyItems items
+
+        state,
+        Cmd.OfJS.either
+          js
+          "Mandadin.Clipboard.CopyTextToClipboard"
+          [| stringified |]
+          (fun _ -> ShareRequestSuccess)
+          Error
+    | ToClipboardSuccess -> state, Cmd.none
     | Error ex ->
         eprintfn "Update Error [%s]" ex.Message
         state, Cmd.none
@@ -332,17 +346,25 @@ module ListItems =
   let toolbar (state: State) (dispatch: Dispatch<Msg>) =
     let getId = defaultArg state.TrackListId ""
 
-    section [ attr.``class`` "border row flex-center" ] [
-      h4 [] [ text getId ]
-      button [ attr.``class`` "paper-btn btn-small"
-               on.click (fun _ -> dispatch GoBack) ] [
-        Icon.Get Back None
+    div [ attr.``class`` "border" ] [
+      section [ attr.``class`` "row flex-center" ] [
+        h4 [] [ text getId ]
       ]
-      if state.CanShare then
+      section [ attr.``class`` "row flex-center" ] [
         button [ attr.``class`` "paper-btn btn-small"
-                 on.click (fun _ -> ShareRequest state.Items |> dispatch) ] [
-          Icon.Get Share None
+                 on.click (fun _ -> dispatch GoBack) ] [
+          Icon.Get Back None
         ]
+        if state.CanShare then
+          button [ attr.``class`` "paper-btn btn-small"
+                   on.click (fun _ -> ShareRequest state.Items |> dispatch) ] [
+            Icon.Get Share None
+          ]
+        button [ attr.``class`` "paper-btn btn-small"
+                 on.click (fun _ -> ToClipboard state.Items |> dispatch) ] [
+          (Icon.Get Copy None)
+        ]
+      ]
     ]
 
   let view (state: State) (dispatch: Dispatch<Msg>) =

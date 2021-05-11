@@ -115,3 +115,25 @@ ul.notes-list li::before,
   margin-left: 1em;
   margin-right: 1em;
 }
+
+.modal {
+  overflow-y: auto;
+}
+
+/* Small devices (landscape phones, 576px and up) */
+@media (max-width: 576px) {
+  
+  .modal-state:checked+.modal .modal-body {
+    margin-top: 12vh;
+  }
+  .hidden-on-mobile {
+    display: none;
+  }
+ }
+
+/* Medium devices (tablets, 768px and up) */
+@media (max-width: 768px) { 
+  .hidden-on-mobile {
+    display: initial;
+  }
+ }
