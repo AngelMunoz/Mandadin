@@ -176,7 +176,7 @@ module Main =
       ]
       footer [ attr.``class`` "paper row flex-spaces mandadin-footer" ] [
         p [] [
-          text "\u00A9 Tunaxor Apps 2020"
+          text "\u00A9 Tunaxor Apps 2020 - 2021"
         ]
         p [] [
           text "Mandadin4"
