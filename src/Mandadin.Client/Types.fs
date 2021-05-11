@@ -5,8 +5,8 @@ open Bolero.Html
 
 [<RequireQualifiedAccess>]
 type View =
-  | [<EndPoint "/">] Notes
-  | [<EndPoint "/lists">] Lists
+  | [<EndPoint "/">] Lists
+  | [<EndPoint "/notes">] Notes
   | [<EndPoint "lists/{listId}">] ListDetail of listId: string
   | [<EndPoint "/import">] Import
 
