@@ -99,196 +99,196 @@ module ListItems =
 
     match msg with
     | GoBack ->
-        match onGoBackRequested with
-        | Some onGoBackRequested ->
-            onGoBackRequested ()
-            state, Cmd.none
-        | None -> state, Cmd.none
+      match onGoBackRequested with
+      | Some onGoBackRequested ->
+        onGoBackRequested ()
+        state, Cmd.none
+      | None -> state, Cmd.none
     | HideDone hide ->
-        { state with HideDone = hide },
-        Cmd.batch [ Cmd.ofMsg GetItems
-                    Cmd.ofMsg SaveHideDone ]
+      { state with HideDone = hide },
+      Cmd.batch [ Cmd.ofMsg GetItems
+                  Cmd.ofMsg SaveHideDone ]
     | SetCurrentItem item ->
-        { state with CurrentItem = item }, Cmd.ofMsg (ValidateItem(item))
+      { state with CurrentItem = item }, Cmd.ofMsg (ValidateItem(item))
     | RequestHideDone ->
-        let listId = defaultArg state.TrackListId "X"
+      let listId = defaultArg state.TrackListId "X"
 
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.GetHideDone"
-          [| listId |]
-          RequestHideDoneSuccess
-          (fun _ -> GetItems)
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.GetHideDone"
+        [| listId |]
+        RequestHideDoneSuccess
+        (fun _ -> GetItems)
     | RequestHideDoneSuccess hideDone ->
-        { state with HideDone = hideDone }, Cmd.ofMsg GetItems
+      { state with HideDone = hideDone }, Cmd.ofMsg GetItems
     | SaveHideDone ->
-        let listId = defaultArg state.TrackListId "X"
+      let listId = defaultArg state.TrackListId "X"
 
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.SaveHideDone"
-          [| listId; state.HideDone |]
-          (fun _ -> SaveHideDoneSuccess)
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.SaveHideDone"
+        [| listId; state.HideDone |]
+        (fun _ -> SaveHideDoneSuccess)
+        Error
     | SaveHideDoneSuccess -> state, Cmd.none
     | GetItems ->
-        match state.TrackListId with
-        | Some listId ->
-            state,
-            Cmd.OfJS.either
-              js
-              "Mandadin.Database.GetListItems"
-              [| listId; state.HideDone |]
-              GetItemsSuccess
-              Error
-        | None -> emptyListId
+      match state.TrackListId with
+      | Some listId ->
+        state,
+        Cmd.OfJS.either
+          js
+          "Mandadin.Database.GetListItems"
+          [| listId; state.HideDone |]
+          GetItemsSuccess
+          Error
+      | None -> emptyListId
     | GetItemsSuccess list ->
-        { state with
-            Items =
-              list
-              |> Seq.sortBy (fun item -> item.Name)
-              |> List.ofSeq },
-        Cmd.none
+      { state with
+          Items =
+            list
+            |> Seq.sortBy (fun item -> item.Name)
+            |> List.ofSeq },
+      Cmd.none
     | ValidateItem item ->
-        match state.TrackListId with
-        | Some listid ->
-            let onSuccess nameExists = ValidateItemSuccess(nameExists, item)
+      match state.TrackListId with
+      | Some listid ->
+        let onSuccess nameExists = ValidateItemSuccess(nameExists, item)
 
-            state,
-            Cmd.OfJS.either
-              js
-              "Mandadin.Database.ListItemExists"
-              [| listid; state.CurrentItem |]
-              onSuccess
-              Error
-        | None -> emptyListId
-    | ValidateItemSuccess (nameExists, itemName) ->
-        let canAdd = not nameExists && itemName.Length <> 0
-
-        { state with
-            CanAddCurrentItem = canAdd },
-        Cmd.none
-
-    | CreateItem item ->
-        match state.TrackListId with
-        | Some listid ->
-            state,
-            Cmd.OfJS.either
-              js
-              "Mandadin.Database.CreateListItem"
-              [| listid; item |]
-              CreateItemSuccess
-              Error
-        | None -> emptyListId
-    | CreateItemSuccess item ->
-        { state with
-            Items =
-              (item :: state.Items)
-              |> List.sortBy (fun item -> item.Name) },
-        Cmd.none
-    | UpdateItemProp (item, prop) ->
-        match prop with
-        | IsDone isDone ->
-            state,
-            Cmd.OfJS.either
-              js
-              "Mandadin.Database.UpdateListItem"
-              [| { item with IsDone = isDone } |]
-              UpdateItemPropSuccess
-              Error
-        | Name name ->
-            state, Cmd.ofMsg (ValidateExisting { item with Name = name })
-    | ValidateExisting item ->
         state,
         Cmd.OfJS.either
           js
           "Mandadin.Database.ListItemExists"
-          [| item.ListId; item.Name |]
-          (fun exists -> ValidateExistingSuccess(exists, item))
+          [| listid; state.CurrentItem |]
+          onSuccess
           Error
-    | ValidateExistingSuccess (exists, item) ->
-        match exists with
-        | true -> state, Cmd.none
-        | false ->
-            state,
-            Cmd.OfJS.either
-              js
-              "Mandadin.Database.UpdateListItem"
-              [| item |]
-              UpdateItemPropSuccess
-              Error
-    | UpdateItemPropSuccess item ->
-        let items =
-          match state.HideDone, item.IsDone with
-          | true, true ->
-              state.Items
-              |> List.filter (fun i -> i.Id <> item.Id)
-          | _ ->
-              state.Items
-              |> List.map (fun i -> if i.Id = item.Id then item else i)
+      | None -> emptyListId
+    | ValidateItemSuccess (nameExists, itemName) ->
+      let canAdd = not nameExists && itemName.Length <> 0
 
+      { state with
+          CanAddCurrentItem = canAdd },
+      Cmd.none
 
-        { state with
-            Items = items |> List.sortBy (fun item -> item.Name) },
-        Cmd.none
-    | ShowConfirmDeleteModal show ->
-        { state with
-            ShowConfirmDeleteModal = show },
-        Cmd.none
-    | ShowConfirmDeleteModalAction (item, result) ->
-        let cmd =
-          match result with
-          | Ok result when result -> Cmd.ofMsg (DeleteItem item)
-          | _ -> Cmd.ofMsg (ShowConfirmDeleteModal None)
-
-        state, cmd
-    | DeleteItem item ->
+    | CreateItem item ->
+      match state.TrackListId with
+      | Some listid ->
         state,
         Cmd.OfJS.either
           js
-          "Mandadin.Database.DeleteListItem"
-          [| item |]
-          DeleteItemSuccess
+          "Mandadin.Database.CreateListItem"
+          [| listid; item |]
+          CreateItemSuccess
           Error
-    | DeleteItemSuccess item ->
-        let items =
+      | None -> emptyListId
+    | CreateItemSuccess item ->
+      { state with
+          Items =
+            (item :: state.Items)
+            |> List.sortBy (fun item -> item.Name) },
+      Cmd.none
+    | UpdateItemProp (item, prop) ->
+      match prop with
+      | IsDone isDone ->
+        state,
+        Cmd.OfJS.either
+          js
+          "Mandadin.Database.UpdateListItem"
+          [| { item with IsDone = isDone } |]
+          UpdateItemPropSuccess
+          Error
+      | Name name ->
+        state, Cmd.ofMsg (ValidateExisting { item with Name = name })
+    | ValidateExisting item ->
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.ListItemExists"
+        [| item.ListId; item.Name |]
+        (fun exists -> ValidateExistingSuccess(exists, item))
+        Error
+    | ValidateExistingSuccess (exists, item) ->
+      match exists with
+      | true -> state, Cmd.none
+      | false ->
+        state,
+        Cmd.OfJS.either
+          js
+          "Mandadin.Database.UpdateListItem"
+          [| item |]
+          UpdateItemPropSuccess
+          Error
+    | UpdateItemPropSuccess item ->
+      let items =
+        match state.HideDone, item.IsDone with
+        | true, true ->
           state.Items
           |> List.filter (fun i -> i.Id <> item.Id)
-          |> List.sortBy (fun item -> item.Name)
+        | _ ->
+          state.Items
+          |> List.map (fun i -> if i.Id = item.Id then item else i)
 
-        { state with
-            Items = items
-            ShowConfirmDeleteModal = None },
-        Cmd.none
+
+      { state with
+          Items = items |> List.sortBy (fun item -> item.Name) },
+      Cmd.none
+    | ShowConfirmDeleteModal show ->
+      { state with
+          ShowConfirmDeleteModal = show },
+      Cmd.none
+    | ShowConfirmDeleteModalAction (item, result) ->
+      let cmd =
+        match result with
+        | Ok result when result -> Cmd.ofMsg (DeleteItem item)
+        | _ -> Cmd.ofMsg (ShowConfirmDeleteModal None)
+
+      state, cmd
+    | DeleteItem item ->
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.DeleteListItem"
+        [| item |]
+        DeleteItemSuccess
+        Error
+    | DeleteItemSuccess item ->
+      let items =
+        state.Items
+        |> List.filter (fun i -> i.Id <> item.Id)
+        |> List.sortBy (fun item -> item.Name)
+
+      { state with
+          Items = items
+          ShowConfirmDeleteModal = None },
+      Cmd.none
 
     | ShareRequest items ->
-        let stringified = stringifyItems items
-        let idValue = defaultArg state.TrackListId "Mandadin"
+      let stringified = stringifyItems items
+      let idValue = defaultArg state.TrackListId "Mandadin"
 
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Share.ShareContent"
-          [| idValue; stringified |]
-          (fun _ -> ShareRequestSuccess)
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Share.ShareContent"
+        [| idValue; stringified |]
+        (fun _ -> ShareRequestSuccess)
+        Error
     | ShareRequestSuccess -> state, Cmd.none
     | ToClipboard items ->
-        let stringified = stringifyItems items
+      let stringified = stringifyItems items
 
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Clipboard.CopyTextToClipboard"
-          [| stringified |]
-          (fun _ -> ShareRequestSuccess)
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Clipboard.CopyTextToClipboard"
+        [| stringified |]
+        (fun _ -> ShareRequestSuccess)
+        Error
     | ToClipboardSuccess -> state, Cmd.none
     | Error ex ->
-        eprintfn "Update Error [%s]" ex.Message
-        state, Cmd.none
+      eprintfn "Update Error [%s]" ex.Message
+      state, Cmd.none
 
   let private newItemForm (state: State) (dispatch: Dispatch<Msg>) =
     let currentContentTxt = "Nombre del objeto..."

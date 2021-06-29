@@ -5,174 +5,146 @@ open Bolero
 open Bolero.Html
 open Microsoft.JSInterop
 open Bolero.Remoting.Client
-
+open Mandadin.Client.Components
+open System
 
 module Main =
 
   type State =
     { View: View
       Theme: Theme
-      CanShare: bool }
+      CanShare: bool
+      HasOverlayControls: bool
+      Title: string }
 
   type Msg =
     | SetView of View
     | TryChangeTheme of Theme
     | ChangeThemeSuccess of bool * Theme
+    | GetHasOverlay
+    | GetHasOverlaySuccess of bool
     | GetTheme
     | GetThemeSuccess of string
     | CanShare
     | CanShareSuccess of bool
     | Error of exn
 
+  let (|Morning|Evening|Night|Unknown|) =
+    function
+    | num when num > 4 && num < 12 -> Morning
+    | num when num > 11 && num < 20 -> Evening
+    | num when num > 19 || num < 5 -> Night
+    | num -> Unknown num
+
+  let getGreeting () =
+    let hour = DateTime.Now.Hour
+
+    match hour with
+    | Morning -> "Buenos dias!"
+    | Evening -> "Buenas tardes!"
+    | Night -> "Buenas noches!"
+    | Unknown num ->
+      printfn $"{num}"
+      "Hola!"
+
   let private init (_: 'arg) : State * Cmd<Msg> =
     { View = View.Notes
       Theme = Theme.Dark
-      CanShare = false },
+      CanShare = false
+      HasOverlayControls = false
+      Title = getGreeting () },
     Cmd.batch [ Cmd.ofMsg GetTheme
-                Cmd.ofMsg CanShare ]
+                Cmd.ofMsg CanShare
+                Cmd.ofMsg GetHasOverlay ]
 
-  let private update
-    (msg: Msg)
-    (state: State)
-    (js: IJSRuntime)
-    : State * Cmd<Msg> =
+  let private update (msg: Msg) (state: State) (js: IJSRuntime) : State * Cmd<Msg> =
     match msg with
-    | SetView view -> { state with View = view }, Cmd.none
+    | SetView view ->
+      { state with
+          View = view
+          Title = getGreeting () },
+      Cmd.none
     | TryChangeTheme theme ->
-        let jsThemeArg =
-          match theme with
-          | Theme.Dark -> "Dark"
-          | _ -> "Light"
+      let jsThemeArg =
+        match theme with
+        | Theme.Dark -> "Dark"
+        | _ -> "Light"
 
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Theme.SwitchTheme"
-          [| jsThemeArg |]
-          (fun didChange -> ChangeThemeSuccess(didChange, theme))
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Theme.SwitchTheme"
+        [| jsThemeArg |]
+        (fun didChange -> ChangeThemeSuccess(didChange, theme))
+        Error
     | ChangeThemeSuccess (didChange, theme) ->
-        if didChange then
-          { state with Theme = theme }, Cmd.none
-        else
-          state, Cmd.ofMsg (Error(exn "Failed to change theme"))
-    | GetTheme ->
-        state,
-        Cmd.OfJS.either js "Mandadin.Theme.GetTheme" [||] GetThemeSuccess Error
+      if didChange then
+        { state with Theme = theme }, Cmd.none
+      else
+        state, Cmd.ofMsg (Error(exn "Failed to change theme"))
+    | GetHasOverlay ->
+      state,
+      Cmd.OfJS.either js "Mandadin.Theme.HasOverlayControls" [||] GetHasOverlaySuccess Error
+    | GetHasOverlaySuccess hasOverlay ->
+      { state with
+          HasOverlayControls = hasOverlay },
+      Cmd.none
+    | GetTheme -> state, Cmd.OfJS.either js "Mandadin.Theme.GetTheme" [||] GetThemeSuccess Error
     | GetThemeSuccess theme ->
-        let theme =
-          match theme with
-          | "Light" -> Theme.Light
-          | _ -> Theme.Dark
+      let theme =
+        match theme with
+        | "Light" -> Theme.Light
+        | _ -> Theme.Dark
 
-        let cmd =
-          if theme <> state.Theme then
-            Cmd.ofMsg (TryChangeTheme theme)
-          else
-            Cmd.none
+      let cmd =
+        if theme <> state.Theme then
+          Cmd.ofMsg (TryChangeTheme theme)
+        else
+          Cmd.none
 
-        { state with Theme = theme }, cmd
-    | CanShare ->
-        state,
-        Cmd.OfJS.either js "Mandadin.Share.CanShare" [||] CanShareSuccess Error
+      { state with Theme = theme }, cmd
+    | CanShare -> state, Cmd.OfJS.either js "Mandadin.Share.CanShare" [||] CanShareSuccess Error
     | CanShareSuccess canShare -> { state with CanShare = canShare }, Cmd.none
     | Error err ->
-        eprintfn "Update Error: [%s]" err.Message
-        state, Cmd.none
+      eprintfn "Update Error: [%s]" err.Message
+      state, Cmd.none
 
   let private router = Router.infer SetView (fun m -> m.View)
 
-  let private navbar (state: State) (dispatch: Dispatch<Msg>) =
-    nav [ attr.``class`` "border fixed split-nav" ] [
-      section [ attr.``class`` "nav-brand" ] [
-        h3 [] [
-          a [ router.HRef View.Notes ] [
-            text "Mandadin"
-          ]
-        ]
-      ]
-      section [ attr.``class`` "collapsible" ] [
-        input [ attr.id "collapsible1"
-                attr.name "collapsible1"
-                attr.``type`` "checkbox" ]
-        label [ attr.``for`` "collapsible1" ] [
-          for i in 1 .. 3 do
-            div [ attr.``class`` (sprintf "bar%i" i) ] []
-        ]
-        div [ attr.``class`` "collapsible-body" ] [
-          ul [ attr.``class`` "inline" ] [
-            li [] [
-              a [ router.HRef View.Notes ] [
-                text "Notas"
-              ]
-            ]
-            li [] [
-              a [ router.HRef View.Lists ] [
-                text "Listas"
-              ]
-            ]
-            li [ attr.``class`` "cursor pointer"
-                 on.click
-                   (fun _ ->
-                     TryChangeTheme(
-                       if state.Theme = Theme.Dark then
-                         Theme.Light
-                       else
-                         Theme.Dark
-                     )
-                     |> dispatch) ] [
-              textf
-                "Tema %s"
-                (if state.Theme = Theme.Dark then
-                   "Claro"
-                 else
-                   "Oscuro")
-            ]
-          ]
-        ]
-      ]
-    ]
 
   let private navigateToList (dispatch: Dispatch<Msg>) (route: string) =
     View.ListDetail route |> SetView |> dispatch
 
-  let private goBack (dispatch: Dispatch<Msg>) () =
-    SetView View.Lists |> dispatch
+  let private goBack (dispatch: Dispatch<Msg>) () = SetView View.Lists |> dispatch
 
   let private view (state: State) (dispatch: Dispatch<Msg>) : Node =
+    let getRoute (view: View) = router.HRef view
 
+    let onThemeChangeRequest (theme: Theme) = TryChangeTheme theme |> dispatch
 
-    let isNotesOrLists =
-      state.View = View.Lists || state.View = View.Notes
-
-    let paddedClass addPadd =
-      if addPadd then " with-80px-pad" else ""
-
-    article [ attr.``class`` (
-                sprintf "mandadin-content%s" (paddedClass isNotesOrLists)
-              ) ] [
-      if isNotesOrLists then
-        navbar state dispatch
+    article [ attr.``class`` "mandadin" ] [
+      if state.HasOverlayControls then
+        TitleBar.View(Some state.Title)
+      Navbar.View state.Theme onThemeChangeRequest getRoute
       main [ attr.``class`` "paper container mandadin-main" ] [
         match state.View with
         | View.Import ->
-            comp<Views.Import.Page>
-              [ "OnGoToListRequested"
-                => Some(navigateToList dispatch) ]
-              []
-        | View.Notes ->
-            comp<Views.Notes.Page> [ "CanShare" => state.CanShare ] []
+          comp<Views.Import.Page>
+            [ "OnGoToListRequested"
+              => Some(navigateToList dispatch) ]
+            []
+        | View.Notes -> comp<Views.Notes.Page> [ "CanShare" => state.CanShare ] []
         | View.Lists ->
-            comp<Views.Lists.Page>
-              [ "OnRouteRequested"
-                => Some(navigateToList dispatch) ]
-              []
+          comp<Views.Lists.Page>
+            [ "OnRouteRequested"
+              => Some(navigateToList dispatch) ]
+            []
         | View.ListDetail listId ->
-            comp<Views.ListItems.Page>
-              [ "ListId" => Some listId
-                "CanShare" => state.CanShare
-                "OnBackRequested" => Some(goBack dispatch) ]
-              []
+          comp<Views.ListItems.Page>
+            [ "ListId" => Some listId
+              "CanShare" => state.CanShare
+              "OnBackRequested" => Some(goBack dispatch) ]
+            []
       ]
       footer [ attr.``class`` "paper row flex-spaces mandadin-footer" ] [
         p [] [

@@ -1,6 +1,6 @@
-import { SwitchTheme, GetTheme } from '/js/theme.js'
-import { CopyTextToClipboard, ReadTextFromClipboard } from '/js/clipboard.js'
-import { CanShare, ShareContent, ImportShareData } from '/js/share.js'
+import { SwitchTheme, GetTheme } from './theme.js';
+import { CopyTextToClipboard, ReadTextFromClipboard } from './clipboard.js';
+import { CanShare, ShareContent, ImportShareData } from './share.js';
 import {
     FindNotes,
     CreateNote,
@@ -19,14 +19,17 @@ import {
     DeleteListItem,
     GetHideDone,
     SaveHideDone
-} from '/js/database.js';
+} from './database.js';
+
+import { HasOverlayControls } from './overlay-controls.js';
 
 
 (function(window) {
     window.Mandadin = window.Mandadin || {
         Theme: {
             SwitchTheme,
-            GetTheme
+            GetTheme,
+            HasOverlayControls
         },
         Share: {
             CanShare,

@@ -53,106 +53,106 @@ module Notes =
   let private update (msg: Msg) (state: State) (js: IJSRuntime) =
     match msg with
     | SetCurrentContent content ->
-        { state with CurrentContent = content }, Cmd.none
+      { state with CurrentContent = content }, Cmd.none
     | DeleteNote (noteid, rev) ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.DeleteNote"
-          [| noteid; rev |]
-          DeleteNoteSuccess
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.DeleteNote"
+        [| noteid; rev |]
+        DeleteNoteSuccess
+        Error
     | DeleteNoteSuccess arr ->
-        let noteid = Array.head arr
+      let noteid = Array.head arr
 
-        let notes =
-          state.Notes
-          |> List.filter (fun note -> note.Id <> noteid)
+      let notes =
+        state.Notes
+        |> List.filter (fun note -> note.Id <> noteid)
 
-        { state with Notes = notes }, Cmd.none
+      { state with Notes = notes }, Cmd.none
     | GetNotes ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.FindNotes"
-          [||]
-          GetNotesSuccess
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.FindNotes"
+        [||]
+        GetNotesSuccess
+        Error
     | GetNotesSuccess notes ->
-        { state with
-            Notes = notes |> List.ofSeq },
-        Cmd.none
+      { state with
+          Notes = notes |> List.ofSeq },
+      Cmd.none
     | CreateNote content ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.CreateNote"
-          [| content |]
-          CreateNoteSuccess
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.CreateNote"
+        [| content |]
+        CreateNoteSuccess
+        Error
     | CreateNoteSuccess note ->
-        { state with
-            Notes = note :: state.Notes },
-        Cmd.none
+      { state with
+          Notes = note :: state.Notes },
+      Cmd.none
     | UpdateNote note ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.UpdateNote"
-          [| note |]
-          UpdateNoteSuccess
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.UpdateNote"
+        [| note |]
+        UpdateNoteSuccess
+        Error
     | UpdateNoteSuccess updated ->
-        let notes =
-          state.Notes
-          |> List.map
-               (fun note ->
-                 if note.Id = updated.Id then
-                   updated
-                 else
-                   note)
+      let notes =
+        state.Notes
+        |> List.map
+             (fun note ->
+               if note.Id = updated.Id then
+                 updated
+               else
+                 note)
 
-        { state with
-            Notes = notes
-            CurrentContent = "" },
-        Cmd.none
+      { state with
+          Notes = notes
+          CurrentContent = "" },
+      Cmd.none
     | FromClipboard ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Clipboard.ReadTextFromClipboard"
-          [||]
-          FromClipboardSuccess
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Clipboard.ReadTextFromClipboard"
+        [||]
+        FromClipboardSuccess
+        Error
     | FromClipboardSuccess content ->
-        { state with CurrentContent = content }, Cmd.none
+      { state with CurrentContent = content }, Cmd.none
     | ToClipboard note ->
-        let text =
-          sprintf "Nota Mandadin:\n%s " note.Content
+      let text =
+        sprintf "Nota Mandadin:\n%s " note.Content
 
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Clipboard.CopyTextToClipboard"
-          [| text |]
-          (fun _ -> ToClipboardSuccess)
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Clipboard.CopyTextToClipboard"
+        [| text |]
+        (fun _ -> ToClipboardSuccess)
+        Error
     | ToClipboardSuccess -> state, Cmd.none
     | ShareContent note ->
-        let title = "Nota"
-        let text = sprintf "%s" note.Content
+      let title = "Nota"
+      let text = sprintf "%s" note.Content
 
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Share.ShareContent"
-          [| title; text; "" |]
-          (fun _ -> ShareContentSuccess)
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Share.ShareContent"
+        [| title; text; "" |]
+        (fun _ -> ShareContentSuccess)
+        Error
     | ShareContentSuccess -> state, Cmd.none
     | Error err ->
-        eprintfn "%s" err.Message
-        state, Cmd.none
+      eprintfn "%s" err.Message
+      state, Cmd.none
 
   let private newNoteForm (state: State) (dispatch: Dispatch<Msg>) =
     let submitBtnTxt = "Guardar"

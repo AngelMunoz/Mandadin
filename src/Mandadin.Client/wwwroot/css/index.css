@@ -1,5 +1,8 @@
+:root {
+  --fallback-title-bar-height: 40px;
+}
+
 html, body {
-  height: 100%;
   padding: 0;
   margin: 0;
   background-color: var(--main-background, #41403e);
@@ -13,22 +16,43 @@ nav .bar1, nav .bar2, nav .bar3 {
   cursor: pointer;
 }
 
-.mandadin-content {
+article.mandadin {
   display: flex;
   flex-direction: column;
   height: 100vh;
   overflow-y: auto;
 }
-.mandadin-content.with-80px-pad {
-  padding-top: 80px;
+
+header.mandadin-title-bar {
+    app-region: drag;
+  /* Pre-fix app-region during standardization process */
+  -webkit-app-region: drag;
+  height: calc(env(titlebar-area-height, var(--fallback-title-bar-height)) + 2px);
+  display: flex;
+  justify-content: center;
+  position: sticky;
+  top: 0;
+}
+
+.mandadin-title-bar .no-drag {
+  app-region: no-drag;
+  /* Pre-fix app-region during standardization process */
+  -webkit-app-region: no-drag;
+  margin: auto;
+}
+
+nav.mandadin-navbar {
+  flex: 0 1;
 }
 
 .mandadin-main {
   margin: 1em auto;
+  flex: 1 0;
 }
 
 .mandadin-footer {
   margin: auto 0 0 0;
+  flex: 0 1;
 }
 
 .notes-form {
@@ -78,9 +102,6 @@ nav .bar1, nav .bar2, nav .bar3 {
     width: 100%;
     margin: 0.5em 0;
     padding: 0;
-  }
-  .mandadin-content:not(.with-80px-pad) {
-    height: 100vh
   }
 }
 

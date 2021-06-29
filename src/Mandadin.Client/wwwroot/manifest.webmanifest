@@ -3,6 +3,9 @@
   "short_name": "Mandadin",
   "start_url": "/",
   "display": "standalone",
+  "display_override": [
+    "window-controls-overlay"
+  ],
   "icons": [
     {
       "src": "/android-icon-36x36.png",
@@ -67,7 +70,7 @@
     "params": {
       "title": "title",
       "text": "text",
-      "url":  "url"
+      "url": "url"
     }
   }
 }
