@@ -1,4 +1,4 @@
 export function HasOverlayControls() {
-    if ('windowControlsOverlay' in navigator && navigator['windowControlsOverlay'].visible) { return true; }
+    if ('windowControlsOverlay' in navigator) { return true; }
     return false;
 }

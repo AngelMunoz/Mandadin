@@ -21,10 +21,10 @@
     <PackageReference Include="Fable.Store" Version="1.0.0-beta-005" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="5.0.*" />
   </ItemGroup>
-  <ItemGroup>
+  <!-- <ItemGroup>
     <Content Remove="wwwroot\**" />
     <Content Include="wwwroot\**" Watch="false" />
-  </ItemGroup>
+  </ItemGroup> -->
   <ItemGroup>
     <ServiceWorker Include="wwwroot\service-worker.js" PublishedContent="wwwroot\service-worker.published.js" />
   </ItemGroup>

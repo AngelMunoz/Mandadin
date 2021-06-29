@@ -1,3 +1,4 @@
+#! /usr/bin/env pwsh
 Write-Host "Deleting 'dist' Directory";
 Remove-Item -Recurse "./dist" -ErrorAction SilentlyContinue;
 Write-Host "Building Release";
