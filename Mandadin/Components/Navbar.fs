@@ -1,8 +1,8 @@
-namespace Mandadin.Client.Components
+namespace Mandadin.Components
 
 open Bolero
 open Bolero.Html
-open Mandadin.Client
+open Mandadin
 open Microsoft.AspNetCore.Components.Routing
 
 module Navbar =

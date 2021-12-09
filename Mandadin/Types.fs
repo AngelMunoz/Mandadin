@@ -1,4 +1,4 @@
-namespace Mandadin.Client
+namespace Mandadin
 
 open Bolero
 open Bolero.Html

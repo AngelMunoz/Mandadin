@@ -1,4 +1,4 @@
-namespace Mandadin.Client
+namespace Mandadin
 
 open Microsoft.AspNetCore.Components.WebAssembly.Hosting
 

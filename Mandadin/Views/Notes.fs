@@ -1,11 +1,11 @@
-namespace Mandadin.Client.Views
+namespace Mandadin.Views
 
 open Elmish
 open Microsoft.JSInterop
 open Bolero
 open Bolero.Html
 open Bolero.Remoting.Client
-open Mandadin.Client
+open Mandadin
 open Microsoft.AspNetCore.Components
 
 [<RequireQualifiedAccess>]

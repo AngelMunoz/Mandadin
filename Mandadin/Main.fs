@@ -1,11 +1,11 @@
-namespace Mandadin.Client
+namespace Mandadin
 
 open Elmish
 open Bolero
 open Bolero.Html
 open Microsoft.JSInterop
 open Bolero.Remoting.Client
-open Mandadin.Client.Components
+open Mandadin.Components
 open System
 
 module Main =
