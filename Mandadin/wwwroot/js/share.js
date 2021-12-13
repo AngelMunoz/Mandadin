@@ -22,7 +22,7 @@ export function CanShare() {
  * @param {string} title 
  * @param {string} text 
  * @param {string?} url 
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
 export async function ShareContent(title, text, url = undefined) {
     if (!navigator.share) {
