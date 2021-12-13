@@ -51,7 +51,7 @@ const HideDone = new PouchDB("hideDone");
   } catch (error) {
     console.warn(`Error creating index for ListItems [${error.message}]`);
   }
-})(ListItems)
+})(ListItems);
 
 
 function mapDocument(doc) {
@@ -60,7 +60,7 @@ function mapDocument(doc) {
     id: doc._id,
     rev: doc._rev,
     content: doc.content
-  }
+  };
 }
 
 function mapAllDocs({ total_rows, offset, rows }) {
@@ -80,7 +80,7 @@ export function FindNotes() {
     .then(mapAllDocs)
     .then(findNotesResult => {
       console.log({ result: findNotesResult });
-      return findNotesResult
+      return findNotesResult;
     });
 }
 
@@ -90,7 +90,7 @@ export function FindNotes() {
  * @returns {Promise<Note>}
  */
 export async function CreateNote(content) {
-  const note = { content, _id: `${Date.now()}` }
+  const note = { content, _id: `${Date.now()}` };
 
   const createNoteResult = await Notes.put(note);
   console.log({ createNoteResult });
@@ -105,7 +105,7 @@ export async function CreateNote(content) {
 export async function UpdateNote(note) {
   const toUpdate = { _id: note.id, _rev: note.rev, ...note, id: undefined, rev: undefined };
   const updateNoteResult = await Notes.put(toUpdate);
-  return { ...note, rev: updateNoteResult.rev }
+  return { ...note, rev: updateNoteResult.rev };
 }
 
 /**
@@ -206,7 +206,7 @@ export function ImportList(name, items) {
   return CreateList(name)
     .then((list) => Promise.all([BulkCreateListItems(list.id, items), list]))
     .then(([docs, list]) => {
-      const errors = docs.filter(doc => doc.error)
+      const errors = docs.filter(doc => doc.error);
       if (errors.length > 0) {
         console.warn(`Could not import the following docs`, errors);
       }
@@ -231,7 +231,7 @@ function BulkCreateListItems(listId, items) {
       name,
       isDone,
       listId
-    }))
+    }));
   return ListItems.bulkDocs(toCreate);
 }
 
@@ -242,11 +242,11 @@ async function DeleteAllListItemsFromList(listId) {
     const queryAllResult = await ListItems.find({
       selector: { listId },
       use_index: '_design/mandadinddoclistid'
-    })
+    });
     console.log({ queryAllResult });
     if (queryAllResult.docs && queryAllResult.docs.length > 0) {
       const docs = queryAllResult.docs.map(doc => ({ ...doc, _deleted: true }));
-      const deleteResult = await ListItems.bulkDocs(docs)
+      const deleteResult = await ListItems.bulkDocs(docs);
       console.log({ deleteResult });
     }
     return true;
@@ -258,40 +258,40 @@ async function DeleteAllListItemsFromList(listId) {
 
 export async function DeleteList(listId, rev) {
   try {
-    await DeleteAllListItemsFromList(listId)
-    const deleteResult = await Lists.remove(listId, rev)
+    await DeleteAllListItemsFromList(listId);
+    const deleteResult = await Lists.remove(listId, rev);
     console.log({ deleteResult });
   } catch (deleteListError) {
-    console.warn({ deleteListError })
+    console.warn({ deleteListError });
     return Promise.reject(deleteListError.message);
   }
 }
 
 function buildIndexQuery(listId, hideDone) {
   const selector =
-    hideDone === false ? { listId } : { listId, isDone: false }
+    hideDone === false ? { listId } : { listId, isDone: false };
 
   return {
     fields: ['_id', '_rev', 'listId', 'isDone', 'name'],
     use_index: `_design/${hideDone ? 'mandadinddocisdone' : 'mandadinddoclistid'}`,
     selector,
-  }
+  };
 }
 
 
 /**
  * 
  * @param {string} listId
- * @param {boolean} hideDone 
+ * @param {Promise<ListItem} hideDone 
  */
 export async function GetListItems(listId, hideDone) {
   try {
-    const index = buildIndexQuery(listId, hideDone)
+    const index = buildIndexQuery(listId, hideDone);
     const { docs } = await ListItems.find(index);
     return docs.map(({ _id, _rev, listId, isDone, name }) =>
       ({ id: _id, rev: _rev, listId, isDone, name }));
   } catch (getListItemsError) {
-    console.warn({ getListItemsError })
+    console.warn({ getListItemsError });
     return Promise.reject(getListItemsError.message);
   }
 }
@@ -325,7 +325,7 @@ export async function CreateListItem(listId, name) {
     const { _id, isDone, _rev, ...props } = await ListItems.get(id);
     return { id: _id, rev: _rev, listId: props.listId, name: props.name, isDone };
   } catch (createListItemError) {
-    console.warn({ createListItemError })
+    console.warn({ createListItemError });
     return Promise.reject(createListItemError.message);
   }
 }
@@ -337,8 +337,8 @@ export async function CreateListItem(listId, name) {
  */
 export async function UpdateListItem(item) {
   try {
-    const { id, rev, ...itemProps } = item
-    const { ok, ...result } = await ListItems.put({ _id: id, _rev: rev, ...itemProps })
+    const { id, rev, ...itemProps } = item;
+    const { ok, ...result } = await ListItems.put({ _id: id, _rev: rev, ...itemProps });
     if (!ok) { return Promise.reject('Failed to update ListItem'); }
     return { ...item, ...result };
   } catch (updateListItemError) {

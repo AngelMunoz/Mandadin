@@ -5,11 +5,17 @@ const clipboard = navigator.clipboard;
 /**
  * 
  * @param {string} text 
- * @returns {Promise<void>}
+ * @returns {Promise<bool>}
  */
-export function CopyTextToClipboard(text) {
+export async function CopyTextToClipboard(text) {
     if (!clipboard) return Promise.reject("Clipboard API not available");
-    return clipboard.writeText(text);
+    try {
+        await clipboard.writeText(text);
+        return true;
+    } catch (error) {
+        console.warn(error);
+        return false;
+    }
 }
 
 /**

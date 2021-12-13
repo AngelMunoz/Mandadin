@@ -2,6 +2,7 @@ namespace Mandadin
 
 open Bolero
 open Bolero.Html
+open System.Threading.Tasks
 
 [<RequireQualifiedAccess>]
 type View =
@@ -72,3 +73,22 @@ module Icon =
     | Close -> Close().Fill(color).Elt()
     | Check -> Check().Fill(color).Elt()
     | Back -> Back().Fill(color).Elt()
+
+
+type IClipboardService =
+  abstract SendToClipboard : string -> Task<bool>
+  abstract GetFromClipboard : unit -> Task<string>
+
+type IShareService =
+  abstract member GetCanShare : unit -> Task<bool>
+  abstract member ShareContent : string * string * string option -> Task<unit>
+  abstract member ImportShareContent : unit -> Task<string>
+
+type ITrackListItemService =
+  abstract member Find : string * bool -> Task<TrackListItem list>
+  abstract member Create : string * string -> Task<TrackListItem>
+  abstract member Update : TrackListItem -> Task<TrackListItem>
+  abstract member Delete : TrackListItem -> Task<TrackListItem>
+  abstract member Exists : string * string -> Task<bool>
+  abstract member ShareItems : string * TrackListItem list -> Task<bool>
+  abstract member SendToClipboard : string * TrackListItem list -> Task<bool>

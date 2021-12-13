@@ -24,11 +24,17 @@ export function CanShare() {
  * @param {string?} url 
  * @returns {Promise<void>}
  */
-export function ShareContent(title, text, url = undefined) {
-    if (navigator.share) {
-        return navigator.share({ title, text, url });
+export async function ShareContent(title, text, url = undefined) {
+    if (!navigator.share) {
+        return Promise.reject('Share API not available');
     }
-    return Promise.reject('Share API not available');
+    try {
+        await navigator.share({ title, text, url });
+        return true;
+    } catch (error) {
+        console.warn(error);
+        return false;
+    }
 }
 
 channel.onmessage = function(event) {
@@ -46,17 +52,17 @@ channel.onmessage = function(event) {
             url: ""
         }));
     }
-}
+};
 
-const delay = time => new Promise(resolve => setTimeout(() => resolve(), time))
+const delay = time => new Promise(resolve => setTimeout(() => resolve(), time));
 
 export async function ImportShareData() {
-    channel.postMessage({ type: "GET_IMPORT_DATA" })
+    channel.postMessage({ type: "GET_IMPORT_DATA" });
     await delay(500);
     try {
         return JSON.parse(sessionStorage.getItem("import"));
     } catch (e) {
         console.error(e);
-        return { text: '', title: '', url: '' }
+        return { text: '', title: '', url: '' };
     }
 }
