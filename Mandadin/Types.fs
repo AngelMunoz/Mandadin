@@ -15,7 +15,16 @@ type View =
 type Theme =
   | Light
   | Dark
-  | Custom
+
+  member this.Inverse =
+    match this with
+    | Light -> Dark
+    | Dark -> Light
+
+  member this.AsString =
+    match this with
+    | Light -> "Light"
+    | Dark -> "Dark"
 
 type SaveResult = { Id: string; Ok: bool; Rev: string }
 
@@ -74,6 +83,10 @@ module Icon =
     | Check -> Check().Fill(color).Elt()
     | Back -> Back().Fill(color).Elt()
 
+type IThemeService =
+  abstract SwitchTheme : Theme -> Task<bool>
+  abstract GetTheme : unit -> Task<Theme>
+  abstract HasOverlayControls : unit -> Task<bool>
 
 type IClipboardService =
   abstract SendToClipboard : string -> Task<bool>
