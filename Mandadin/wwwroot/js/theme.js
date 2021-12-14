@@ -8,7 +8,7 @@ const themedb = new PouchDB('theme');
  * @param {string} theme 
  * @returns {Promise<boolean>}
  */
-export function SaveTheme(theme) {
+function SaveTheme(theme) {
   return themedb.get("theme")
     .then(doc => themedb.put({ ...doc, theme }))
     .then(({ ok }) => ok)

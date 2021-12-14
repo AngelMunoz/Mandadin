@@ -1,6 +1,5 @@
 namespace Mandadin
 
-open System.Threading.Tasks
 open Microsoft.JSInterop
 
 [<RequireQualifiedAccess>]
@@ -20,6 +19,18 @@ module Items =
 
 
 module JsModuleIdentifiers =
+
+  [<RequireQualifiedAccess>]
+  module ThemeIdentifiers =
+    [<Literal>]
+    let SwitchTheme = "Mandadin.Theme.SwitchTheme"
+
+    [<Literal>]
+    let HasOverlayControls = "Mandadin.Theme.HasOverlayControls"
+
+    [<Literal>]
+    let GetTheme = "Mandadin.Theme.GetTheme"
+
   [<RequireQualifiedAccess>]
   module Share =
     [<Literal>]
@@ -56,6 +67,36 @@ module JsModuleIdentifiers =
 
     [<Literal>]
     let ListItemExists = "Mandadin.Database.ListItemExists"
+
+[<RequireQualifiedAccess>]
+module ThemeService =
+  open JsModuleIdentifiers
+
+  let GetService (jsRuntime: IJSRuntime) =
+    { new IThemeService with
+        member _.SwitchTheme theme =
+          task {
+            let theme = theme.AsString
+
+            return! jsRuntime.InvokeAsync(ThemeIdentifiers.SwitchTheme, theme)
+          }
+
+        member _.GetTheme() =
+          task {
+            let! theme = jsRuntime.InvokeAsync(ThemeIdentifiers.GetTheme)
+
+            return
+              match theme with
+              | "Light" -> Theme.Light
+              | "Dark" -> Theme.Dark
+              | _ -> Theme.Dark
+          }
+
+        member _.HasOverlayControls() =
+          jsRuntime
+            .InvokeAsync(ThemeIdentifiers.HasOverlayControls)
+            .AsTask() }
+
 
 [<RequireQualifiedAccess>]
 module Clipboard =
@@ -96,12 +137,8 @@ module Share =
 
         member _.ShareContent(title, content, ?url) =
           task {
-            let args =
-              match url with
-              | Some url -> [| title; content; url |]
-              | None -> [| title; content |]
-
-            let! result = jsRuntime.InvokeAsync(Share.ShareContent, args)
+            let! result =
+              jsRuntime.InvokeAsync(Share.ShareContent, title, content, url)
 
             return result
           }
@@ -117,7 +154,7 @@ module Share =
           } }
 
 [<RequireQualifiedAccess>]
-module TrackListItem =
+module TrackListItemService =
 
   open JsModuleIdentifiers
 
@@ -132,7 +169,8 @@ module TrackListItem =
             let! result =
               jsRuntime.InvokeAsync(
                 Database.GetListItems,
-                [| listId :> obj; hideDone :> obj |]
+                listId :> obj,
+                hideDone :> obj
               )
 
             return result |> List.ofSeq
@@ -141,23 +179,21 @@ module TrackListItem =
         member _.Create(listId, name) =
           task {
             let! result =
-              jsRuntime.InvokeAsync(Database.CreateListItem, [| listId; name |])
+              jsRuntime.InvokeAsync(Database.CreateListItem, listId, name)
 
             return result
           }
 
         member _.Update item =
           task {
-            let! result =
-              jsRuntime.InvokeAsync(Database.UpdateListItem, [| item |])
+            let! result = jsRuntime.InvokeAsync(Database.UpdateListItem, item)
 
             return result
           }
 
         member _.Delete item =
           task {
-            let! result =
-              jsRuntime.InvokeAsync(Database.DeleteListItem, [| item |])
+            let! result = jsRuntime.InvokeAsync(Database.DeleteListItem, item)
 
             return result
           }
@@ -165,10 +201,7 @@ module TrackListItem =
         member _.Exists(listId, listName) =
           task {
             let! result =
-              jsRuntime.InvokeAsync(
-                Database.ListItemExists,
-                [| listId; listName |]
-              )
+              jsRuntime.InvokeAsync(Database.ListItemExists, listId, listName)
 
             return result
           }
