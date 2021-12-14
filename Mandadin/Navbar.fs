@@ -1,77 +1,126 @@
 namespace Mandadin.Components
 
 open Bolero
+open Fun.Blazor
 open Mandadin
 open Microsoft.AspNetCore.Components.Routing
-open Fun.Blazor
+open FSharp.Control.Reactive
 
 module Navbar =
 
-  let View
-    (theme: Theme)
-    (onThemeChangeRequest: Theme -> unit)
-    (getHref: View -> Attr)
+  let private collapsibleInput =
+    [ input () {
+        id "collapsible1"
+        name "collapsible1"
+        type' "checkbox"
+        for' "collapsible1"
+      }
+
+      Html.label [ Html.attr.``for`` "collapsible1" ] [
+        for i in 1 .. 3 do
+          Html.div [ Html.attr.``class`` (sprintf "bar%i" i) ] []
+      ] ]
+
+  let private navLinks (switchTheme: _ -> unit) (theme: IStore<Theme>) =
+    let themeText theme =
+      match theme with
+      | Theme.Light -> "Oscuro"
+      | Theme.Dark -> "Claro"
+      |> Html.textf "Tema %s"
+
+    [ li () {
+        childContent [
+          NavLink'() {
+            Match NavLinkMatch.All
+            href "/notes"
+            childContent "Notas"
+          }
+        ]
+      }
+      li () {
+        childContent [
+          NavLink'() {
+            Match NavLinkMatch.All
+            href "/"
+            childContent "Listas"
+          }
+        ]
+      }
+      li () {
+        class' "cursor pointer"
+        onclick switchTheme
+
+        childContent [
+          html.watch (theme, themeText)
+        ]
+      } ]
+
+  let private switchTheme
+    (hook: IComponentHook)
+    (themeService: IThemeService)
+    (theme: IStore<Theme>)
+    _
     =
-    let collapsible =
-      [ input () {
-          id "collapsible1"
-          name "collapsible1"
-          type' "checkbox"
-          for' "collapsible1"
+    themeService.SwitchTheme(theme.Current.Inverse)
+    |> Observable.ofTask
+    |> Observable.subscribe (fun didChange ->
+      if didChange then
+        theme.Publish theme.Current.Inverse)
+    |> hook.AddDispose
 
-          childContent [
-            Html.label [ Html.attr.``for`` "collapsible1" ] [
-              for i in 1 .. 3 do
-                div () { class' $"bar{i}" }
+  let View () =
+    let _view (hook: IComponentHook, themeService: IThemeService) =
+      let theme = hook.UseStore Theme.Dark
+
+      hook.OnFirstAfterRender
+      |> Observable.map themeService.GetTheme
+      |> Observable.switchTask
+      |> Observable.subscribe theme.Publish
+      |> hook.AddDispose
+
+
+      nav () {
+        class' "split-nav mandadin-navbar"
+
+        childContent [
+          section () {
+            class' "collapsible"
+
+            childContent [
+              yield! collapsibleInput
+              div () {
+                class' "collapsible-body"
+
+                childContent [
+                  ul () {
+                    class' "inline"
+
+                    childContent (
+                      navLinks (switchTheme hook themeService theme) theme
+                    )
+                  }
+                ]
+              }
             ]
-          ]
-        } ]
-
-    let listLinks =
-      let getThemeText =
-        textf
-          "Tema %s"
-          (if theme = Theme.Dark then
-             "Claro"
-           else
-             "Oscuro")
-
-      let onThemeItemClick _ =
-        match theme with
-        | Theme.Light -> onThemeChangeRequest Theme.Dark
-        | _ -> onThemeChangeRequest Theme.Light
-
-      [ li [] [
-          navLink NavLinkMatch.All [ getHref View.Notes ] [ text "Notas" ]
+          }
         ]
-        li [] [
-          navLink NavLinkMatch.All [ getHref View.Lists ] [ text "Listas" ]
-        ]
-        li [ attr.``class`` "cursor pointer"
-             on.click onThemeItemClick ] [
-          getThemeText
-        ] ]
+      }
 
-    nav [ attr.``class`` "split-nav mandadin-navbar" ] [
-      section [ attr.``class`` "collapsible" ] [
-        yield! collapsible
-        div [ attr.``class`` "collapsible-body" ] [
-          ul [ attr.``class`` "inline" ] [
-            yield! listLinks
-          ]
-        ]
-      ]
-    ]
-
+    html.inject ("mandadin-nav", _view)
 
 module TitleBar =
   let View (title: string option) =
-    let title = defaultArg title "Hola!"
+    let appTitle = defaultArg title "Hola!"
 
-    header [ attr.``class`` "border mandadin-title-bar" ] [
-      navLink
-        NavLinkMatch.All
-        [ attr.href "/"
-          attr.``class`` "no-drag" ]
-        [ textf $"{title} | Mandadin" ]
-    ]
+    header () {
+      class' "border mandadin-title-bar"
+
+      childContent [
+        NavLink'() {
+          class' "no-drag"
+          Match NavLinkMatch.All
+          href "/"
+          childContent $"{appTitle} | Mandadin"
+        }
+      ]
+    }

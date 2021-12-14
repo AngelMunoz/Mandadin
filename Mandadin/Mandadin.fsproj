@@ -7,7 +7,7 @@
   <ItemGroup>
     <Compile Include="Types.fs" />
     <Compile Include="Services.fs" />
-    <Compile Include="Components/Navbar.fs" />
+    <Compile Include="Navbar.fs" />
     <Compile Include="Modals.fs" />
     <Compile Include="Views/Import.fs" />
     <Compile Include="Views/Notes.fs" />
@@ -19,6 +19,7 @@
   <ItemGroup>
     <PackageReference Include="Bolero" Version="0.*" />
     <PackageReference Include="Bolero.Build" Version="0.*" />
+    <PackageReference Include="FSharp.Control.Reactive" Version="5.0.2" />
     <PackageReference Include="Fun.Blazor" Version="1.*" />
     <PackageReference Include="Fun.Blazor.HtmlTemplate" Version="0.*" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="6.0.*" />
