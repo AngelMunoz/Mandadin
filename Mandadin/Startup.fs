@@ -7,7 +7,7 @@ open Mandadin
 let builder =
   WebAssemblyHostBuilder.CreateDefault(Environment.GetCommandLineArgs())
 
-builder.RootComponents.Add<Main.Mandadin>("#main")
+builder.AddFunBlazorNode("#main", Main.View()).Services.AddFunBlazor() |> ignore
 
 builder.Services.AddScoped<IThemeService> (fun services ->
   let jsRuntime = services.GetService<IJSRuntime>()
