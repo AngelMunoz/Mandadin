@@ -109,9 +109,7 @@ module Navbar =
     html.inject ("mandadin-nav", _view)
 
 module TitleBar =
-  let View (title: string option) =
-    let appTitle = defaultArg title "Hola!"
-
+  let View (appTitle: string) =
     header () {
       class' "border mandadin-title-bar"
 
