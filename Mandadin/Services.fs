@@ -22,6 +22,10 @@ module JsModuleIdentifiers =
 
   [<RequireQualifiedAccess>]
   module ThemeIdentifiers =
+
+    [<Literal>]
+    let SetDocumentTitle = "Mandadin.Theme.SetDocumentTitle"
+
     [<Literal>]
     let SwitchTheme = "Mandadin.Theme.SwitchTheme"
 
@@ -74,6 +78,11 @@ module ThemeService =
 
   let GetService (jsRuntime: IJSRuntime) =
     { new IThemeService with
+        member _.SetDocumentTitle title =
+          jsRuntime
+            .InvokeAsync(ThemeIdentifiers.SetDocumentTitle, title)
+            .AsTask()
+
         member _.SwitchTheme theme =
           task {
             let theme = theme.AsString

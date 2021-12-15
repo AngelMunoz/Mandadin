@@ -1,15 +1,7 @@
 namespace Mandadin
 
 open Bolero
-open Bolero.Html
 open System.Threading.Tasks
-
-[<RequireQualifiedAccess>]
-type View =
-  | [<EndPoint "/">] Lists
-  | [<EndPoint "/notes">] Notes
-  | [<EndPoint "lists/{listId}">] ListDetail of listId: string
-  | [<EndPoint "/import">] Import
 
 [<RequireQualifiedAccess>]
 type Theme =
@@ -87,6 +79,7 @@ type IThemeService =
   abstract SwitchTheme : Theme -> Task<bool>
   abstract GetTheme : unit -> Task<Theme>
   abstract HasOverlayControls : unit -> Task<bool>
+  abstract SetDocumentTitle: string -> Task<unit>
 
 type IClipboardService =
   abstract SendToClipboard : string -> Task<bool>

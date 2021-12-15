@@ -27,6 +27,7 @@ import { HasOverlayControls } from './overlay-controls.js';
 (function(window) {
     window.Mandadin = window.Mandadin || {
         Theme: {
+            SetDocumentTitle(title) { document.title = title || "Mandadin 4" },
             SwitchTheme,
             GetTheme,
             HasOverlayControls
