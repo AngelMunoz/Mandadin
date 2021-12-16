@@ -75,13 +75,13 @@ function mapAllDocs({ total_rows, offset, rows }) {
   ));
 }
 
-export function FindNotes() {
-  return Notes.allDocs({ include_docs: true })
-    .then(mapAllDocs)
-    .then(findNotesResult => {
-      console.log({ result: findNotesResult });
-      return findNotesResult;
-    });
+/**
+ * 
+ * @returns {Promise<Note[]>}
+ */
+export async function FindNotes() {
+  const result = await Notes.allDocs({ include_docs: true });
+  return mapAllDocs(result);
 }
 
 /**
@@ -113,8 +113,9 @@ export async function UpdateNote(note) {
  * @param {string} noteid 
  * @returns {Promise<Note>}
  */
-export function FindNote(noteid) {
-  return Notes.get(noteid).then(mapDocument);
+export async function FindNote(noteid) {
+  const doc = await Notes.get(noteid);
+  return mapDocument(doc);
 }
 
 /**
@@ -142,7 +143,7 @@ export async function DeleteNote(noteid, noterev) {
 export async function FindLists() {
   return Lists
     .allDocs({ include_docs: true }).
-    then(({ total_rows, offset, rows }) => {
+    then(({ rows }) => {
       return rows.map(({ id, doc }) => (
         {
           id: id,
@@ -161,11 +162,12 @@ export async function FindLists() {
  * @param {string} name 
  * @return {Promise<List>}
  */
-function FindList(name) {
-  return Lists.get(name).then(doc => ({
+async function FindList(name) {
+  const doc = await Lists.get(name);
+  return ({
     id: doc._id,
     rev: doc._rev
-  }));
+  });
 }
 
 /**
@@ -192,9 +194,9 @@ export async function ListNameExists(name) {
  * @param {string} name 
  * @returns {Promise<List>}
  */
-export function CreateList(name) {
-  return Lists.put({ _id: name })
-    .then(result => ({ id: result.id, rev: result.rev }));
+export async function CreateList(name) {
+  const result = await Lists.put({ _id: name });
+  return ({ id: result.id, rev: result.rev });
 }
 
 /**
@@ -202,20 +204,19 @@ export function CreateList(name) {
  * @param {string} name 
  * @param {Array<[boolean, string]>} items 
  */
-export function ImportList(name, items) {
-  return CreateList(name)
-    .then((list) => Promise.all([BulkCreateListItems(list.id, items), list]))
-    .then(([docs, list]) => {
-      const errors = docs.filter(doc => doc.error);
-      if (errors.length > 0) {
-        console.warn(`Could not import the following docs`, errors);
-      }
-      return list;
-    })
-    .catch(importListError => {
-      console.warn({ importListError });
-      return Promise.reject(importListError.message);
-    });
+export async function ImportList(name, items) {
+  try {
+    const list = await CreateList(name);
+    const docs = await BulkCreateListItems(list.id, items);
+    const errors = docs.filter(doc => doc.error);
+    if (errors.length > 0) {
+      console.warn(`Could not import the following docs`, errors);
+    }
+    return list;
+  } catch (importListError) {
+    console.warn({ importListError });
+    return await Promise.reject(importListError.message);
+  }
 }
 
 /**
@@ -236,7 +237,11 @@ function BulkCreateListItems(listId, items) {
 }
 
 
-
+/**
+ * 
+ * @param {string} listId 
+ * @returns {Promise<boolean>}
+ */
 async function DeleteAllListItemsFromList(listId) {
   try {
     const queryAllResult = await ListItems.find({
@@ -256,6 +261,12 @@ async function DeleteAllListItemsFromList(listId) {
   }
 }
 
+/**
+ * 
+ * @param {string} listId 
+ * @param {string} rev 
+ * @returns {Promise<void>}
+ */
 export async function DeleteList(listId, rev) {
   try {
     await DeleteAllListItemsFromList(listId);
@@ -267,6 +278,12 @@ export async function DeleteList(listId, rev) {
   }
 }
 
+/**
+ * 
+ * @param {string} listId
+ * @param {boolean} hideDone
+ * @returns 
+ */
 function buildIndexQuery(listId, hideDone) {
   const selector =
     hideDone === false ? { listId } : { listId, isDone: false };
@@ -282,7 +299,8 @@ function buildIndexQuery(listId, hideDone) {
 /**
  * 
  * @param {string} listId
- * @param {Promise<ListItem} hideDone 
+ * @param {boolean} hideDone 
+ * @returns {Promise<ListItem[]>}
  */
 export async function GetListItems(listId, hideDone) {
   try {
@@ -295,24 +313,33 @@ export async function GetListItems(listId, hideDone) {
     return Promise.reject(getListItemsError.message);
   }
 }
+
 /**
  * 
+ * @param {string} listId 
  * @param {string} name 
  * @returns {Promise<boolean>}
  */
-export function ListItemExists(listId, name) {
-  return ListItems.find({
-    selector: { listId, name },
-    fields: ['name'],
-    use_index: '_design/mandadinddoclistitemnameindex'
-  })
-    .then(({ docs }) => docs.length > 0)
-    .catch(listItemExistsError => {
-      console.log({ listItemExistsError });
-      return Promise.reject(listItemExistsError.message);
+export async function ListItemExists(listId, name) {
+  try {
+    const { docs } = await ListItems.find({
+      selector: { listId, name },
+      fields: ['name'],
+      use_index: '_design/mandadinddoclistitemnameindex'
     });
+    return docs.length > 0;
+  } catch (listItemExistsError) {
+    console.log({ listItemExistsError });
+    return await Promise.reject(listItemExistsError.message);
+  }
 }
 
+/**
+ * 
+ * @param {string} listId 
+ * @param {string} name 
+ * @returns {Promise<ListItem>}
+ */
 export async function CreateListItem(listId, name) {
   try {
     const { id, ok } = await ListItems.put({
@@ -378,20 +405,22 @@ export function GetHideDone(listId) {
  * 
  * @param {string} listId 
  * @param {boolean} hideDone 
- * @returns {Promise<PouchDB.Core.Response>}
+ * @returns {Promise<{_id: string; _rev: string; hideDone: boolean}>}
  */
-export function SaveHideDone(listId, hideDone) {
-  return HideDone.get(listId)
-    .then(({ _id, _rev }) => HideDone.put({ _id, _rev, hideDone }))
-    .catch(saveHideDoneError => {
-      if (saveHideDoneError.status === 404) {
-        return HideDone.put({ _id: listId, hideDone });
-      }
-      console.warn({ saveHideDoneError });
-      return Promise.reject(saveHideDoneError.message);
-    })
-    .catch(saveHideDoneError => {
-      console.warn({ saveHideDoneError });
-      return Promise.reject(saveHideDoneError.message);
-    });
+export async function SaveHideDone(listId, hideDone) {
+  const { _id, _rev } = await HideDone.get(listId);
+  const result =
+    await HideDone.put({ _id, _rev, hideDone })
+      .catch(saveHideDoneError => {
+        if (saveHideDoneError.status === 404) {
+          return HideDone.put({ _id: listId, hideDone });
+        }
+        console.warn({ saveHideDoneError });
+        return Promise.reject(saveHideDoneError.message);
+      })
+      .catch(saveHideDoneError => {
+        console.warn({ saveHideDoneError });
+        return Promise.reject(saveHideDoneError.message);
+      });
+  return { _id: result.id, _rev: result.rev, hideDone };
 }
