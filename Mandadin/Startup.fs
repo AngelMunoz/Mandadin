@@ -7,28 +7,31 @@ open Mandadin
 let builder =
   WebAssemblyHostBuilder.CreateDefault(Environment.GetCommandLineArgs())
 
-builder.AddFunBlazorNode("#main", Main.View()).Services.AddFunBlazor() |> ignore
-
-builder.Services.AddScoped<IThemeService> (fun services ->
-  let jsRuntime = services.GetService<IJSRuntime>()
-  ThemeService.GetService jsRuntime)
+builder
+  .AddFunBlazorNode("#main", Main.View())
+  .Services.AddFunBlazor()
 |> ignore
 
-builder.Services.AddScoped<IClipboardService> (fun services ->
-  let jsRuntime = services.GetService<IJSRuntime>()
-  Clipboard.GetService jsRuntime)
-|> ignore
+let getService<'Service> (services: IServiceProvider) =
+  services.GetService<'Service>()
 
-builder.Services.AddScoped<IShareService> (fun services ->
-  let jsRuntime = services.GetService<IJSRuntime>()
-  Share.GetService jsRuntime)
-|> ignore
-
-builder.Services.AddScoped<ITrackListItemService> (fun services ->
-  let jsRuntime = services.GetService<IJSRuntime>()
-  let clipboard = services.GetService<IClipboardService>()
-  let share = services.GetService<IShareService>()
-  TrackListItemService.GetService jsRuntime share clipboard)
+// get the service and combine the result into the GetService from the modules
+// fun services -> services |> getService<'Type> |> Module.GetService
+builder
+  .Services
+  .AddScoped<IThemeService>(getService<IJSRuntime> >> ThemeService.GetService)
+  .AddScoped<IClipboardService>(getService<IJSRuntime> >> Clipboard.GetService)
+  .AddScoped<IShareService>(getService<IJSRuntime> >> Share.GetService)
+  .AddScoped<ITrackListService>(
+    getService<IJSRuntime>
+    >> TrackListService.GetService
+  )
+  .AddScoped<INoteService>(getService<IJSRuntime> >> NoteService.GetService)
+  .AddScoped<ITrackListItemService>(fun services ->
+    (getService<IJSRuntime> services,
+     getService<IShareService> services,
+     getService<IClipboardService> services)
+    |||> TrackListItemService.GetService)
 |> ignore
 
 builder.Build().RunAsync()

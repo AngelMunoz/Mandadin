@@ -72,6 +72,43 @@ module JsModuleIdentifiers =
     [<Literal>]
     let ListItemExists = "Mandadin.Database.ListItemExists"
 
+
+    [<Literal>]
+    let FindNote = "Mandadin.Database.FindNote"
+
+    [<Literal>]
+    let FindNotes = "Mandadin.Database.FindNotes"
+
+    [<Literal>]
+    let CreateNote = "Mandadin.Database.CreateNote"
+
+    [<Literal>]
+    let UpdateNote = "Mandadin.Database.UpdateNote"
+
+    [<Literal>]
+    let DeleteNote = "Mandadin.Database.DeleteNote"
+
+    [<Literal>]
+    let FindLists = "Mandadin.Database.FindLists"
+
+    [<Literal>]
+    let FindList = "Mandadin.Database.FindList"
+
+    [<Literal>]
+    let ListNameExists = "Mandadin.Database.ListNameExists"
+
+    [<Literal>]
+    let CreateList = "Mandadin.Database.CreateList"
+
+    [<Literal>]
+    let ImportList = "Mandadin.Database.ImportList"
+
+    [<Literal>]
+    let DeleteList = "Mandadin.Database.DeleteList"
+
+    [<Literal>]
+    let SaveHideDone = "Mandadin.Database.SaveHideDone"
+
 [<RequireQualifiedAccess>]
 module ThemeService =
   open JsModuleIdentifiers
@@ -105,7 +142,6 @@ module ThemeService =
           jsRuntime
             .InvokeAsync(ThemeIdentifiers.HasOverlayControls)
             .AsTask() }
-
 
 [<RequireQualifiedAccess>]
 module Clipboard =
@@ -222,3 +258,72 @@ module TrackListItemService =
         member _.SendToClipboard items =
           let stringified = Items.stringifyItems items
           clipboard.SendToClipboard stringified }
+
+[<RequireQualifiedAccess>]
+module TrackListService =
+  open JsModuleIdentifiers
+
+  let GetService (jsRuntime: IJSRuntime) =
+    { new ITrackListService with
+        override _.CreateList name =
+          jsRuntime
+            .InvokeAsync(Database.CreateList, name)
+            .AsTask()
+
+        override _.DeleteList(name, revision) =
+          jsRuntime
+            .InvokeAsync(Database.DeleteList, name, revision)
+            .AsTask()
+
+        override _.FindList name =
+          jsRuntime
+            .InvokeAsync(Database.FindList, name)
+            .AsTask()
+
+        override _.FindLists() =
+          jsRuntime.InvokeAsync(Database.FindLists).AsTask()
+
+        override _.ImportList(name: string, items: obj array array) =
+          jsRuntime
+            .InvokeAsync(Database.ImportList, name, items)
+            .AsTask()
+
+        override _.ListNameExists name =
+          jsRuntime
+            .InvokeAsync(Database.ImportList, name)
+            .AsTask()
+
+        override _.SaveHideDone(listId, revision) =
+          jsRuntime
+            .InvokeAsync(Database.SaveHideDone, listId, revision)
+            .AsTask() }
+
+
+[<RequireQualifiedAccess>]
+module NoteService =
+  open JsModuleIdentifiers
+
+  let GetService (jsRuntime: IJSRuntime) =
+    { new INoteService with
+        override _.CreateNote content =
+          jsRuntime
+            .InvokeAsync(Database.CreateNote, content)
+            .AsTask()
+
+        override _.DeleteNote(noteId, revision) =
+          jsRuntime
+            .InvokeAsync(Database.DeleteNote, noteId, revision)
+            .AsTask()
+
+        override _.FindNote noteId =
+          jsRuntime
+            .InvokeAsync(Database.FindNote, noteId)
+            .AsTask()
+
+        override _.FindNotes() =
+          jsRuntime.InvokeAsync(Database.FindNotes).AsTask()
+
+        override _.UpdateNote note =
+          jsRuntime
+            .InvokeAsync(Database.UpdateNote, note)
+            .AsTask() }

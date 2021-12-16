@@ -79,7 +79,7 @@ type IThemeService =
   abstract SwitchTheme : Theme -> Task<bool>
   abstract GetTheme : unit -> Task<Theme>
   abstract HasOverlayControls : unit -> Task<bool>
-  abstract SetDocumentTitle: string -> Task<unit>
+  abstract SetDocumentTitle : string -> Task<unit>
 
 type IClipboardService =
   abstract SendToClipboard : string -> Task<bool>
@@ -99,3 +99,24 @@ type ITrackListItemService =
   abstract member Exists : string * string -> Task<bool>
   abstract member ShareItems : string * TrackListItem list -> Task<bool>
   abstract member SendToClipboard : TrackListItem list -> Task<bool>
+
+type ITrackListService =
+  abstract member FindLists : unit -> Task<TrackList list>
+  abstract member FindList : string -> Task<TrackList>
+  abstract member ListNameExists : string -> Task<bool>
+  abstract member CreateList : string -> Task<TrackList>
+  abstract member ImportList : string * obj array array -> Task<TrackList>
+  abstract member DeleteList : string * string -> Task<unit>
+
+  abstract SaveHideDone :
+    string * bool ->
+    Task<{| _id: string
+            _rev: string
+            hideDone: bool |}>
+
+type INoteService =
+  abstract FindNote : string -> Task<Note>
+  abstract FindNotes : unit -> Task<Note list>
+  abstract CreateNote : string -> Task<Note>
+  abstract UpdateNote : Note -> Task<Note>
+  abstract DeleteNote : string * string -> Task<string list>
