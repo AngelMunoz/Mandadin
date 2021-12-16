@@ -6,11 +6,13 @@
         "moduleResolution": "node",
         "baseUrl": "./src/Mandadin.Client",
         "paths": {
-          "/*": ["wwwroot/*"]
+            "/*": [
+                "wwwroot/*"
+            ]
         }
     },
     "include": [
-        "src/Mandadin.Client/wwwroot/js"
+        "./Mandadin/wwwroot/js"
     ],
     "typeAcquisition": {
         "enable": true,
