@@ -50,9 +50,7 @@ module Navbar =
         class' "cursor pointer"
         onclick switchTheme
 
-        childContent [
-          html.watch (theme, themeText)
-        ]
+        childContent (html.watch (theme, themeText))
       } ]
 
   let private switchTheme
