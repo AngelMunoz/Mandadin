@@ -152,10 +152,7 @@ module Clipboard =
         member _.SendToClipboard content =
           task {
             let! result =
-              jsRuntime.InvokeAsync(
-                Clipboard.CopyTextToClipboard,
-                [| content |]
-              )
+              jsRuntime.InvokeAsync(Clipboard.CopyTextToClipboard, content)
 
             return result
           }
@@ -182,14 +179,17 @@ module Share =
 
         member _.ShareContent(title, content, ?url) =
           task {
+            printfn "%s %s" title content
+
             let! result =
-              jsRuntime.InvokeAsync(Share.ShareContent, title, content, url)
+              match url with
+              | None ->
+                jsRuntime.InvokeAsync(Share.ShareContent, title, content)
+              | Some url ->
+                jsRuntime.InvokeAsync(Share.ShareContent, title, content, url)
 
             return result
           }
-
-        member this.ShareContent(title, content) =
-          this.ShareContent(title, content)
 
         member _.ImportShareContent() =
           task {
@@ -253,7 +253,7 @@ module TrackListItemService =
 
         member _.ShareItems(listId, items) =
           let stringified = Items.stringifyItems items
-          share.ShareContent(listId, stringified)
+          share.ShareContent(listId, stringified, None)
 
         member _.SendToClipboard items =
           let stringified = Items.stringifyItems items

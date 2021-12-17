@@ -87,8 +87,7 @@ type IClipboardService =
 
 type IShareService =
   abstract member GetCanShare : unit -> Task<bool>
-  abstract member ShareContent : string * string -> Task<bool>
-  abstract member ShareContent : string * string * string option -> Task<unit>
+  abstract member ShareContent : string * string * string option -> Task<bool>
   abstract member ImportShareContent : unit -> Task<string>
 
 type ITrackListItemService =

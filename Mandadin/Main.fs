@@ -8,6 +8,7 @@ open Fun.Blazor
 open Fun.Blazor.Router
 open Mandadin
 open Mandadin.Components
+open Mandadin.Views
 
 module Main =
   let (|Morning|Evening|Night|Unknown|) =
@@ -29,24 +30,17 @@ module Main =
       "Hola!"
 
   let private importView (navigateToList: string -> unit) =
-    Html.comp<Views.Import.Page>
-      [ "OnGoToListRequested" => Some(navigateToList) ]
-      []
-
-  let private notesView (canShare: bool) =
-    Html.comp<Views.Notes.Page> [ "CanShare" => canShare ] []
+    Html.comp<Import.Page> [ "OnGoToListRequested" => Some(navigateToList) ] []
 
   let private listsView (navigateToList: string -> unit) =
-    Html.comp<Views.Lists.Page>
-      [ "OnRouteRequested" => Some(navigateToList) ]
-      []
+    Html.comp<Lists.Page> [ "OnRouteRequested" => Some(navigateToList) ] []
 
   let private listViewDetail
     (canShare: bool)
     (onBackRequested: unit -> unit)
     (listId: string)
     =
-    Html.comp<Views.ListItems.Page>
+    Html.comp<ListItems.Page>
       [ "ListId" => Some listId
         "CanShare" => canShare
         "OnBackRequested" => Some(onBackRequested) ]
@@ -80,26 +74,27 @@ module Main =
       let hasOverlay = hook.UseStore false
       let canShare = hook.UseStore false
 
-      hook.OnInitialized.Subscribe
-        (fun () ->
-          [ share.GetCanShare()
-            |> Observable.ofTask
-            |> Observable.subscribe canShare.Publish
+      hook.OnInitialized.Subscribe (fun () ->
+        [ share.GetCanShare()
+          |> Observable.ofTask
+          |> Observable.subscribe canShare.Publish
 
-            theme.HasOverlayControls()
-            |> Observable.ofTask
-            |> Observable.subscribe canShare.Publish
+          theme.HasOverlayControls()
+          |> Observable.ofTask
+          |> Observable.subscribe hasOverlay.Publish
 
-            appTitle.Observable
-            |> Observable.map theme.SetDocumentTitle
-            |> Observable.switchTask
-            |> Observable.subscribe ignore
+          appTitle.Observable
+          |> Observable.map theme.SetDocumentTitle
+          |> Observable.switchTask
+          |> Observable.subscribe ignore
 
-            ]
-          |> hook.AddDisposes)
+          ]
+        |> hook.AddDisposes)
       |> hook.AddDispose
 
       adaptiview () {
+        let! canShare = hook.UseCVal canShare
+
         article () {
           class' "mandadin"
 
@@ -110,7 +105,7 @@ module Main =
                 if hasOverlay then
                   TitleBar.View(appTitle.Current)
                 else
-                  Html.empty
+                  html.none
             )
             Navbar.View()
             main () {
@@ -121,10 +116,8 @@ module Main =
                   routeCi "/" (listsView (navigateToRoute appTitle nav))
                   routeCif
                     "/lists/%s"
-                    (listViewDetail
-                      canShare.Current
-                      (navigateToLists appTitle nav))
-                  routeCi "/notes" (notesView canShare.Current)
+                    (listViewDetail canShare (navigateToLists appTitle nav))
+                  routeCi "/notes" (Notes.View canShare)
                   routeCi "/import" (importView (navigateToRoute appTitle nav))
                 ]
               ]
