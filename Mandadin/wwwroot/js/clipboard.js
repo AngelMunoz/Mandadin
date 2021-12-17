@@ -5,7 +5,7 @@ const clipboard = navigator.clipboard;
 /**
  * 
  * @param {string} text 
- * @returns {Promise<bool>}
+ * @returns {Promise<boolean>}
  */
 export async function CopyTextToClipboard(text) {
     if (!clipboard) return Promise.reject("Clipboard API not available");

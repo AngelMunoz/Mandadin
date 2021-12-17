@@ -24,7 +24,7 @@ export function CanShare() {
  * @param {string?} url 
  * @returns {Promise<boolean>}
  */
-export async function ShareContent(title, text, url = undefined) {
+export async function ShareContent(title, text, url = null) {
     if (!navigator.share) {
         return Promise.reject('Share API not available');
     }
