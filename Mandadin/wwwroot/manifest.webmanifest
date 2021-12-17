@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
   "name": "Mandadin",
   "short_name": "Mandadin",
   "start_url": "/",
@@ -55,11 +56,17 @@
       "url": "/lists",
       "description": "Ver mis listas actuales",
       "short_name": "Listas"
+    },
+    {
+      "name": "Notas",
+      "url": "/notes",
+      "description": "Ver mis notas",
+      "short_name": "Notas"
     }
   ],
   "protocol_handlers": [
     {
-      "protocol": "mandadin-web",
+      "protocol": "web+mandadin-web",
       "url": "/lists/%s"
     }
   ],
