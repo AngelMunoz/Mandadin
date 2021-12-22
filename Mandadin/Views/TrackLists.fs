@@ -1,9 +1,10 @@
 namespace Mandadin.Views
 
 open Elmish
+open Fun.Blazor
+open Fun.Blazor.elt
 open Microsoft.JSInterop
 open Bolero
-open Bolero.Html
 open Bolero.Remoting.Client
 open Mandadin
 open Microsoft.AspNetCore.Components
@@ -13,25 +14,13 @@ module Lists =
 
   type State =
     { TrackLists: list<TrackList>
-      CurrentListName: string
-      CanAddCurrentName: bool
-      ShowConfirmDeleteModal: Option<TrackList>
-      ShowImportDialog: bool
-      FromClipboard: Option<string> }
+      ShowConfirmDeleteModal: Option<TrackList> }
 
   type Msg =
-    | SetCurrentListName of string
     | RequestRoute of string
 
     | GetLists
     | GetListsSuccess of seq<TrackList>
-
-    | ValidateListName of string
-    | ValidateListNameSuccess of nameExists: bool * name: string
-
-    | CreateList of string
-    | CreateFromImport of string * array<array<obj>>
-    | CreateListSuccess of TrackList
 
     | DeleteList of TrackList
     | DeleteListSuccess of TrackList
@@ -39,21 +28,11 @@ module Lists =
     | ShowConfirmDeleteModal of Option<TrackList>
     | ShowConfirmDeleteModalAction of TrackList * Result<bool, unit>
 
-    | ShowImportDialog of bool
-    | ShowImportDialogAction of Result<string * string, unit>
-
-    | FromClipboard
-    | FromClipboardSuccess of string
-
     | Error of exn
 
   let init (_: 'arg) =
     { TrackLists = list.Empty
-      CurrentListName = ""
-      CanAddCurrentName = false
-      ShowConfirmDeleteModal = None
-      ShowImportDialog = false
-      FromClipboard = None },
+      ShowConfirmDeleteModal = None },
     Cmd.ofMsg GetLists
 
   let update
@@ -63,158 +42,183 @@ module Lists =
     (onRouteRequested: Option<string -> unit>)
     =
     match msg with
-    | SetCurrentListName name ->
-        { state with CurrentListName = name }, Cmd.ofMsg (ValidateListName name)
     | RequestRoute listid ->
-        match onRouteRequested with
-        | Some onRouteRequested ->
-            onRouteRequested listid
-            state, Cmd.none
-        | None -> state, Cmd.none
-    | GetLists ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.FindLists"
-          [||]
-          GetListsSuccess
-          Error
-    | GetListsSuccess items ->
-        { state with
-            TrackLists = items |> List.ofSeq },
-        Cmd.none
-    | ValidateListName name ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.ListNameExists"
-          [| name |]
-          (fun exists -> ValidateListNameSuccess(exists, name))
-          Error
-    | ValidateListNameSuccess (nameExists, name) ->
-        if nameExists then
-          { state with CanAddCurrentName = false },
-          Cmd.ofMsg (Error(exn "Name already exists"))
-        else
-          { state with
-              CanAddCurrentName = true && name.Length <> 0 },
-          Cmd.none
-    | CreateList name ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.CreateList"
-          [| name |]
-          CreateListSuccess
-          Error
-    | CreateListSuccess list ->
-        { state with
-            TrackLists =
-              (list :: state.TrackLists)
-              |> List.sortBy (fun item -> item.Id)
-            CurrentListName = ""
-            ShowImportDialog = false },
-        Cmd.none
-    | FromClipboard ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Clipboard.ReadTextFromClipboard"
-          [||]
-          FromClipboardSuccess
-          Error
-    | FromClipboardSuccess content ->
-        { state with
-            FromClipboard = Some content },
-        Cmd.ofMsg (ShowImportDialog true)
-    | ShowImportDialog show -> { state with ShowImportDialog = show }, Cmd.none
-    | ShowImportDialogAction result ->
-        let cmd =
-          match result with
-          | Ok (title, content) ->
-              let parsed = Import.parseContentString content
-              Cmd.ofMsg (CreateFromImport(title, parsed))
-          | _ -> Cmd.ofMsg (ShowImportDialog false)
-
-        { state with FromClipboard = None }, cmd
-    | CreateFromImport (title, items) ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.ImportList"
-          [| title; items |]
-          CreateListSuccess
-          Error
-    | ShowConfirmDeleteModal show ->
-        { state with
-            ShowConfirmDeleteModal = show },
-        Cmd.none
-    | ShowConfirmDeleteModalAction (item, result) ->
-        let cmd =
-          match result with
-          | Ok result when result -> Cmd.ofMsg (DeleteList item)
-          | _ -> Cmd.ofMsg (ShowConfirmDeleteModal None)
-
-        state, cmd
-    | DeleteList item ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.DeleteList"
-          [| item.Id; item.Rev |]
-          (fun _ -> DeleteListSuccess item)
-          Error
-    | DeleteListSuccess item ->
-        let list =
-          state.TrackLists
-          |> List.filter (fun i -> i <> item)
-
-        { state with
-            TrackLists = list
-            ShowConfirmDeleteModal = None },
-        Cmd.none
-    | Error ex ->
-        eprintfn "Update Error: [%s]" ex.Message
+      match onRouteRequested with
+      | Some onRouteRequested ->
+        onRouteRequested listid
         state, Cmd.none
+      | None -> state, Cmd.none
+    | GetLists ->
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.FindLists"
+        [||]
+        GetListsSuccess
+        Error
+    | GetListsSuccess items ->
+      { state with
+          TrackLists = items |> List.ofSeq },
+      Cmd.none
+    | ShowConfirmDeleteModal show ->
+      { state with
+          ShowConfirmDeleteModal = show },
+      Cmd.none
+    | ShowConfirmDeleteModalAction (item, result) ->
+      let cmd =
+        match result with
+        | Ok result when result -> Cmd.ofMsg (DeleteList item)
+        | _ -> Cmd.ofMsg (ShowConfirmDeleteModal None)
 
-  let private newListForm (state: State) (dispatch: Dispatch<Msg>) =
-    let currentContentTxt = "Nombre de la nueva lista..."
+      state, cmd
+    | DeleteList item ->
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.DeleteList"
+        [| item.Id; item.Rev |]
+        (fun _ -> DeleteListSuccess item)
+        Error
+    | DeleteListSuccess item ->
+      let list =
+        state.TrackLists
+        |> List.filter (fun i -> i <> item)
 
-    form [ attr.``class`` "row flex-spaces background-muted border notes-form"
-           on.submit (fun _ -> CreateList state.CurrentListName |> dispatch) ] [
-      fieldset [ attr.``class`` "form-group" ] [
-        label [ attr.``for`` "current-content" ] [
-          text currentContentTxt
-        ]
-        textarea [ attr.id "current-content"
-                   attr.placeholder currentContentTxt
-                   bind.input.string
-                     state.CurrentListName
-                     (SetCurrentListName >> dispatch) ] []
-      ]
-      button [ attr.``type`` "submit"
-               attr.disabled (not state.CanAddCurrentName) ] [
-        Icon.Get Save None
-      ]
-      button [ attr.``class`` "paper-btn btn-small"
-               attr.``type`` "button"
-               on.click (fun _ -> FromClipboard |> dispatch) ] [
-        Icon.Get Import None
-      ]
-    ]
+      { state with
+          TrackLists = list
+          ShowConfirmDeleteModal = None },
+      Cmd.none
+    | Error ex ->
+      eprintfn "Update Error: [%s]" ex.Message
+      state, Cmd.none
+
+  let private trackListForm () =
+
+    let _form
+      (
+        hook: IComponentHook,
+        tracklists: ITrackListService,
+        clipboard: IClipboardService,
+        nav: NavigationManager
+      ) =
+      let listTitle = hook.UseStore ""
+      let clipboardContent = hook.UseStore ""
+      let isDisabled = hook.UseStore true
+      let showImportDialog = hook.UseStore false
+
+      let onFormSubmit (store: IStore<string>) _ =
+        async {
+          let! result =
+            tracklists.CreateList store.Current
+            |> Async.AwaitTask
+
+          nav.NavigateTo($"/lists/{result.Id}")
+        }
+
+      let getFromClipboard _ =
+        async {
+          let! content = clipboard.GetFromClipboard() |> Async.AwaitTask
+          clipboardContent.Publish content
+          showImportDialog.Publish true
+        }
+
+      let importResult (result: Result<string * string, unit>) =
+        match result with
+        | Ok (title, content) ->
+          let parsed = Import.parseContentString content
+
+          async {
+            let! list =
+              tracklists.ImportList(title, parsed)
+              |> Async.AwaitTask
+
+            nav.NavigateTo($"lists/{list.Id}")
+          }
+          |> Async.Start
+        | Result.Error _ ->
+          showImportDialog.Publish false
+          clipboardContent.Publish ""
+
+      let setListTitle (store: IStore<string>) (event: ChangeEventArgs) =
+        async {
+          let value: string = unbox event.Value
+          store.Publish value
+          printfn $"{value}"
+          match! (tracklists.ListNameExists value)
+                 |> Async.AwaitTask with
+          | true ->
+            printfn "false" 
+            isDisabled.Publish true
+          | false ->
+            printfn "true" 
+            isDisabled.Publish false
+        }
+
+      adaptiview () {
+        let! listTitleValue = hook.UseAVal listTitle
+        let! isDisabled = hook.UseAVal isDisabled
+        let! showImportDialog = hook.UseAVal showImportDialog
+        let! clipboardContent = hook.UseAVal clipboardContent
+
+        if showImportDialog then
+          Modals.ImportTrackList
+            showImportDialog
+            importResult
+            (Some listTitleValue)
+            (Some clipboardContent)
+
+        form () {
+          class' "row flex-spaces background-muted border notes-form"
+          onsubmitAsync (onFormSubmit listTitle)
+
+          childContent [
+            fieldset () {
+              class' "form-group"
+
+              childContent [
+                elt.label () {
+                  for' "current-content"
+                  childContent "Nombre de la nueva lista..."
+                }
+                textarea () {
+                  id "current-content"
+                  placeholder "Nombre de la nueva lista..."
+                  oninputAsync (setListTitle listTitle)
+                  value listTitleValue
+                }
+              ]
+            }
+            button () {
+              type' "submit"
+              disabled isDisabled
+              childContent (Icon.Get Save None)
+            }
+            button () {
+              class' "paper-btn btn-small"
+              type' "button"
+              onclickAsync getFromClipboard 
+              childContent (Icon.Get Import None)
+            }
+          ]
+        }
+      }
+
+    html.inject ("tracklist-form", _form)
 
   let private listItem (item: TrackList) (dispatch: Dispatch<Msg>) =
-    li [ attr.``class`` "tracklist-item row flex-spaces"
-         attr.key item.Id ] [
-      p [ attr.``class`` "m-05" ] [
-        text item.Id
+    Html.li [ Html.attr.``class`` "tracklist-item row flex-spaces"
+              Html.attr.key item.Id ] [
+      Html.p [ Html.attr.``class`` "m-05" ] [
+        Html.text item.Id
       ]
-      button [ attr.``class`` "paper-btn btn-small btn-primary-outline"
-               on.click (fun _ -> RequestRoute item.Id |> dispatch) ] [
+      Html.button [ Html.attr.``class``
+                      "paper-btn btn-small btn-primary-outline"
+                    Html.on.click (fun _ -> RequestRoute item.Id |> dispatch) ] [
         Icon.Get Text None
       ]
-      button [ attr.``class`` "paper-btn btn-small btn-danger-outline"
-               on.click (fun _ -> ShowConfirmDeleteModal(Some item) |> dispatch) ] [
+      Html.button [ Html.attr.``class`` "paper-btn btn-small btn-danger-outline"
+                    Html.on.click
+                      (fun _ -> ShowConfirmDeleteModal(Some item) |> dispatch) ] [
         Icon.Get Trash None
       ]
     ]
@@ -237,16 +241,11 @@ module Lists =
           ShowConfirmDeleteModalAction(item, result)
           |> dispatch)
 
-    article [] [
-      Modals.ImportTrackList
-        state.ShowImportDialog
-        (ShowImportDialogAction >> dispatch)
-        None
-        state.FromClipboard
-      newListForm state dispatch
+    Html.article [] [
+      trackListForm ()
       if state.ShowConfirmDeleteModal.IsSome then
         deleteModal state.ShowConfirmDeleteModal.Value
-      ul [ attr.``class`` "tracklist-list child-borders" ] [
+      Html.ul [ Html.attr.``class`` "tracklist-list child-borders" ] [
         for item in state.TrackLists do
           listItem item dispatch
       ]

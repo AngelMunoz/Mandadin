@@ -29,9 +29,6 @@ module Main =
       printfn $"{num}"
       "Hola!"
 
-  let private importView (navigateToList: string -> unit) =
-    Html.comp<Import.Page> [ "OnGoToListRequested" => Some(navigateToList) ] []
-
   let private listsView (navigateToList: string -> unit) =
     Html.comp<Lists.Page> [ "OnRouteRequested" => Some(navigateToList) ] []
 
@@ -74,22 +71,23 @@ module Main =
       let hasOverlay = hook.UseStore false
       let canShare = hook.UseStore false
 
-      hook.OnInitialized.Subscribe (fun () ->
-        [ share.GetCanShare()
-          |> Observable.ofTask
-          |> Observable.subscribe canShare.Publish
+      hook.OnInitialized.Subscribe
+        (fun () ->
+          [ share.GetCanShare()
+            |> Observable.ofTask
+            |> Observable.subscribe canShare.Publish
 
-          theme.HasOverlayControls()
-          |> Observable.ofTask
-          |> Observable.subscribe hasOverlay.Publish
+            theme.HasOverlayControls()
+            |> Observable.ofTask
+            |> Observable.subscribe hasOverlay.Publish
 
-          appTitle.Observable
-          |> Observable.map theme.SetDocumentTitle
-          |> Observable.switchTask
-          |> Observable.subscribe ignore
+            appTitle.Observable
+            |> Observable.map theme.SetDocumentTitle
+            |> Observable.switchTask
+            |> Observable.subscribe ignore
 
-          ]
-        |> hook.AddDisposes)
+            ]
+          |> hook.AddDisposes)
       |> hook.AddDispose
 
       adaptiview () {
@@ -118,7 +116,7 @@ module Main =
                     "/lists/%s"
                     (listViewDetail canShare (navigateToLists appTitle nav))
                   routeCi "/notes" (Notes.View canShare)
-                  routeCi "/import" (importView (navigateToRoute appTitle nav))
+                  routeCi "/import" (Import.View())
                 ]
               ]
             }

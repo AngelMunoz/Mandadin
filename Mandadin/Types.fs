@@ -18,6 +18,12 @@ type Theme =
     | Light -> "Light"
     | Dark -> "Dark"
 
+
+type ShareDataPayload =
+  { Text: string
+    Title: string
+    Url: string }
+
 type SaveResult = { Id: string; Ok: bool; Rev: string }
 
 type Note =
@@ -88,7 +94,7 @@ type IClipboardService =
 type IShareService =
   abstract member GetCanShare : unit -> Task<bool>
   abstract member ShareContent : string * string * string option -> Task<bool>
-  abstract member ImportShareContent : unit -> Task<string>
+  abstract member ImportShareContent : unit -> Task<ShareDataPayload>
 
 type ITrackListItemService =
   abstract member Find : string * bool -> Task<TrackListItem list>

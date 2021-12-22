@@ -3,10 +3,11 @@
 open Elmish
 open Microsoft.JSInterop
 open Bolero
-open Bolero.Html
 open Bolero.Remoting.Client
-open Mandadin
 open Microsoft.AspNetCore.Components
+open FSharp.Control.Reactive
+open Fun.Blazor
+open Mandadin
 
 
 [<RequireQualifiedAccess>]
@@ -30,105 +31,75 @@ module Import =
 
     content.Split('\n') |> Array.Parallel.map parseRow
 
-  type ShareDataPayload =
-    { Text: string
-      Title: string
-      Url: string }
+  let View () =
 
-  type State = { ShareData: Option<ShareDataPayload> }
+    let _view
+      (
+        hook: IComponentHook,
+        share: IShareService,
+        trackLists: ITrackListService,
+        nav: NavigationManager
+      ) =
 
+      let store =
+        hook.UseStore<ShareDataPayload option> None
 
-  type Msg =
-    | RequestImportData
-    | RequestImportDataSuccess of ShareDataPayload
-    | ImportResult of Result<string * string, unit>
-    | CreateFromImport of title: string * items: obj array array
-    | CreateListSuccess of TrackList
-    | Error of exn
+      hook.OnInitialized
+      |> Observable.map (fun _ ->
+        task {
+          try
+            let! res = share.ImportShareContent()
+            return Some res
+          with
+          | ex -> return None
+        })
+      |> Observable.switchTask
+      |> Observable.subscribe store.Publish
+      |> hook.AddDispose
 
-
-  let private init (_: 'arg) =
-    { ShareData = None }, Cmd.ofMsg RequestImportData
-
-
-  let private update
-    (msg: Msg)
-    (state: State)
-    (goToList: Option<string -> unit>)
-    (js: IJSRuntime)
-    =
-    match msg with
-    | RequestImportData ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Share.ImportShareData"
-          [||]
-          RequestImportDataSuccess
-          Error
-    | RequestImportDataSuccess data ->
-        let share = Some data
-        { state with ShareData = share }, Cmd.none
-    | ImportResult result ->
-        match result with
-        | Ok (title, content) ->
+      let importContent (res: Result<string * string, unit>) =
+        task {
+          match res with
+          | Ok (title, content) ->
             let items = parseContentString content
-            state, Cmd.ofMsg (CreateFromImport(title, items))
-        | Result.Error () ->
+            let! list = trackLists.ImportList(title, items)
+            return Some list
+          | Result.Error _ -> return None
+        }
+        |> Observable.ofTask
+        |> Observable.subscribe (fun item ->
+          item
+          |> Option.iter (fun item -> nav.NavigateTo($"/lists/{item.Id}")))
+        |> hook.AddDispose
 
-            { state with ShareData = None }, Cmd.none
-    | CreateFromImport (title, items) ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.ImportList"
-          [| title; items |]
-          CreateListSuccess
-          Error
-    | CreateListSuccess trackList ->
-        goToList
-        |> Option.iter (fun goToList -> goToList trackList.Id)
 
-        state, Cmd.none
-    | Error err ->
-        eprintfn "%O" err
-        { state with ShareData = None }, Cmd.none
+      let getStoreContent (store: IStore<ShareDataPayload option>) =
+        let _content content =
+          match content with
+          | Some content ->
+            Modals.ImportTrackList
+              true
+              importContent
+              (Some content.Title)
+              (Some content.Text)
+          | None ->
+            p () {
+              childContent
+                "No pudimos obtener informacion de lo que nos querias compartir 😢"
+            }
 
-  let view (state: State) (dispatch: Dispatch<Msg>) =
-    let data =
-      state.ShareData
-      |> Option.defaultValue ({ Title = ""; Text = ""; Url = "" })
+        html.watch (store, _content)
 
-    article [] [
-      a [ attr.href "/"
-          attr.``class`` "paper-btn btn-small" ] [
-        Icon.Get Back None
-      ]
-      if state.ShareData.IsNone then
-        p [] [
-          text
-            "No pudimos obtener informacion de lo que nos querias compartir 😢"
+
+      article () {
+        childContent [
+          a () {
+            class' "paper-btn btn-small"
+            href "/"
+            childContent (Icon.Get Back None)
+          }
+          getStoreContent store
         ]
-      Modals.ImportTrackList
-        state.ShareData.IsSome
-        (ImportResult >> dispatch)
-        (Some data.Title)
-        (Some data.Text)
-    ]
+      }
 
-
-  type Page() as this =
-    inherit ProgramComponent<State, Msg>()
-
-    [<Parameter>]
-    member val OnGoToListRequested: Option<string -> unit> = None with get, set
-
-    override _.Program =
-      let update msg state =
-        update msg state this.OnGoToListRequested this.JSRuntime
-
-
-      Program.mkProgram init update view
-#if DEBUG
-      |> Program.withConsoleTrace
-#endif
+    html.inject ("mandadin-impport-view", _view)

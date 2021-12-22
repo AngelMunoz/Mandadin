@@ -290,7 +290,7 @@ module TrackListService =
 
         override _.ListNameExists name =
           jsRuntime
-            .InvokeAsync(Database.ImportList, name)
+            .InvokeAsync(Database.ListNameExists, name)
             .AsTask()
 
         override _.SaveHideDone(listId, revision) =
