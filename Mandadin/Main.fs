@@ -29,9 +29,6 @@ module Main =
       printfn $"{num}"
       "Hola!"
 
-  let private listsView (navigateToList: string -> unit) =
-    Html.comp<Lists.Page> [ "OnRouteRequested" => Some(navigateToList) ] []
-
   let private listViewDetail
     (canShare: bool)
     (onBackRequested: unit -> unit)
@@ -111,7 +108,7 @@ module Main =
 
               childContent [
                 html.route [
-                  routeCi "/" (listsView (navigateToRoute appTitle nav))
+                  routeCi "/" (Lists.View())
                   routeCif
                     "/lists/%s"
                     (listViewDetail canShare (navigateToLists appTitle nav))

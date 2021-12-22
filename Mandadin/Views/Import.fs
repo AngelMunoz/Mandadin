@@ -1,9 +1,5 @@
 ﻿namespace Mandadin.Views
 
-open Elmish
-open Microsoft.JSInterop
-open Bolero
-open Bolero.Remoting.Client
 open Microsoft.AspNetCore.Components
 open FSharp.Control.Reactive
 open Fun.Blazor
