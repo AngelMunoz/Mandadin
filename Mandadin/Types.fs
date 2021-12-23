@@ -18,6 +18,10 @@ type Theme =
     | Light -> "Light"
     | Dark -> "Dark"
 
+type Route =
+  | Lists
+  | Notes
+  | ListItem of string
 
 type ShareDataPayload =
   { Text: string
@@ -30,7 +34,6 @@ type Note =
   { Id: string
     Content: string
     Rev: string }
-
 
 type TrackList = { Id: string; Rev: string }
 
@@ -119,9 +122,14 @@ type ITrackListService =
             _rev: string
             hideDone: bool |}>
 
+  abstract GetHideDone : string -> Task<bool>
+
 type INoteService =
   abstract FindNote : string -> Task<Note>
   abstract FindNotes : unit -> Task<Note list>
   abstract CreateNote : string -> Task<Note>
   abstract UpdateNote : Note -> Task<Note>
   abstract DeleteNote : string * string -> Task<string list>
+
+type IRoutingService =
+  abstract NavigateTo : Route -> unit

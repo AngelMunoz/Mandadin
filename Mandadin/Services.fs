@@ -1,5 +1,7 @@
 namespace Mandadin
 
+open Mandadin
+open Microsoft.AspNetCore.Components
 open Microsoft.JSInterop
 
 [<RequireQualifiedAccess>]
@@ -108,6 +110,9 @@ module JsModuleIdentifiers =
 
     [<Literal>]
     let SaveHideDone = "Mandadin.Database.SaveHideDone"
+
+    [<Literal>]
+    let GetHideDone = "Mandadin.Database.GetHideDone"
 
 [<RequireQualifiedAccess>]
 module ThemeService =
@@ -293,9 +298,14 @@ module TrackListService =
             .InvokeAsync(Database.ListNameExists, name)
             .AsTask()
 
-        override _.SaveHideDone(listId, revision) =
+        override _.SaveHideDone(listId, hideDone) =
           jsRuntime
-            .InvokeAsync(Database.SaveHideDone, listId, revision)
+            .InvokeAsync(Database.SaveHideDone, listId, hideDone)
+            .AsTask()
+
+        override _.GetHideDone listId =
+          jsRuntime
+            .InvokeAsync(Database.GetHideDone, listId)
             .AsTask() }
 
 
@@ -327,3 +337,13 @@ module NoteService =
           jsRuntime
             .InvokeAsync(Database.UpdateNote, note)
             .AsTask() }
+
+[<RequireQualifiedAccess>]
+module Navigation =
+  let GetService (nav: NavigationManager) =
+    { new IRoutingService with
+        override _.NavigateTo route =
+          match route with
+          | Notes -> nav.NavigateTo("/notes")
+          | Lists -> nav.NavigateTo("/lists")
+          | ListItem listId -> nav.NavigateTo($"/lists/{listId}") }

@@ -1,422 +1,354 @@
 namespace Mandadin.Views
 
-open Elmish
-open Microsoft.JSInterop
-open Bolero
-open Bolero.Html
-open Bolero.Remoting.Client
-open Mandadin
+open FSharp.Control.Reactive
+open FSharp.Data.Adaptive
 open Microsoft.AspNetCore.Components
-open Microsoft.AspNetCore.Components.Web.Virtualization
-
+open Fun.Blazor
+open Mandadin
 
 [<RequireQualifiedAccess>]
 module ListItems =
-  let stringifyItems (items: list<TrackListItem>) : string =
-    let isDoneToX (isDone: bool) = if isDone then 'x' else ' '
 
-    let stringified =
-      items
-      |> Array.ofList
-      |> Array.Parallel.map
-           (fun item -> sprintf "[ %c ] %s" (isDoneToX item.IsDone) item.Name)
+  let private newItemForm canAddItem onItemCreate =
+    let _view (hook: IComponentHook) =
+      let isDisabled = hook.UseStore true
 
-    System.String.Join('\n', stringified)
+      adaptiview () {
+        let! itemName, setItemName = cval("").WithSetter()
+        let! isDisabledValue = hook.UseAVal isDisabled
 
-  type State =
-    { Items: list<TrackListItem>
-      TrackListId: Option<string>
-      CurrentItem: string
-      CanAddCurrentItem: bool
-      HideDone: bool
-      CanShare: bool
-      ShowConfirmDeleteModal: Option<TrackListItem> }
+        let validateAndSet (event: ChangeEventArgs) =
+          let itemName = unbox event.Value
+          setItemName itemName
 
+          async {
+            match! canAddItem itemName with
+            | true -> isDisabled.Publish false
+            | false -> isDisabled.Publish true
+          }
 
-  type UpdatableItemProp =
-    | IsDone of bool
-    | Name of string
+        form () {
+          class' "row flex-spaces background-muted border notes-form"
 
-  type Msg =
-    | GoBack
-    | SetCurrentItem of string
+          onsubmitAsync (fun _ -> onItemCreate itemName)
 
-    | GetItems
-    | GetItemsSuccess of seq<TrackListItem>
+          childContent [
+            fieldset () {
+              class' "form-group"
 
-    | ValidateItem of string
-    | ValidateItemSuccess of itemExists: bool * name: string
+              childContent [
+                LabelBuilder() {
+                  for' "current-content"
+                  childContent "Nombre del objeto..."
+                }
+                textarea () {
+                  id "current-content"
+                  placeholder "Nombre del objeto..."
+                  value itemName
+                  oninputAsync validateAndSet
+                }
+              ]
+            }
+            button () {
+              type' "submit"
+              class' "paper-btn btn-small"
+              disabled isDisabledValue
+              childContent (Icon.Get Save None)
+            }
+          ]
+        }
+      }
 
-    | ValidateExisting of TrackListItem
-    | ValidateExistingSuccess of itemExists: bool * item: TrackListItem
-    | UpdateItemProp of item: TrackListItem * prop: UpdatableItemProp
-    | UpdateItemPropSuccess of TrackListItem
+    html.inject ("mandadin-tracklist-item-form", _view)
 
-    | DeleteItem of TrackListItem
-    | DeleteItemSuccess of TrackListItem
-
-    | CreateItem of string
-    | CreateItemSuccess of TrackListItem
-
-    | ShowConfirmDeleteModal of Option<TrackListItem>
-    | ShowConfirmDeleteModalAction of TrackListItem * Result<bool, unit>
-
-    | ShareRequest of list<TrackListItem>
-    | ShareRequestSuccess
-
-    | ToClipboard of list<TrackListItem>
-    | ToClipboardSuccess
-
-    | RequestHideDone
-    | RequestHideDoneSuccess of bool
-
-    | SaveHideDone
-    | SaveHideDoneSuccess
-
-    | HideDone of bool
-
-    | Error of exn
-
-
-  let init (listId: Option<string>) (canShare: bool) =
-    { Items = []
-      TrackListId = listId
-      HideDone = false
-      CurrentItem = ""
-      CanAddCurrentItem = false
-      CanShare = canShare
-      ShowConfirmDeleteModal = None },
-    Cmd.batch [ Cmd.ofMsg RequestHideDone ]
-
-  let update
-    (msg: Msg)
-    (state: State)
-    (onGoBackRequested: Option<unit -> unit>)
-    (js: IJSRuntime)
+  let private listItem
+    canAddItem
+    onItemUpdate
+    onItemDelete
+    (item: TrackListItem)
     =
-    let emptyListId =
-      state, Cmd.ofMsg (Error(exn "ListId cannot be Empty"))
+    li () {
+      class' "listitem-item"
+      key item.Id
 
-    match msg with
-    | GoBack ->
-      match onGoBackRequested with
-      | Some onGoBackRequested ->
-        onGoBackRequested ()
-        state, Cmd.none
-      | None -> state, Cmd.none
-    | HideDone hide ->
-      { state with HideDone = hide },
-      Cmd.batch [ Cmd.ofMsg GetItems
-                  Cmd.ofMsg SaveHideDone ]
-    | SetCurrentItem item ->
-      { state with CurrentItem = item }, Cmd.ofMsg (ValidateItem(item))
-    | RequestHideDone ->
-      let listId = defaultArg state.TrackListId "X"
+      childContent [
+        fieldset () {
+          class' "form-group"
+          style' "display: flex;"
 
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.GetHideDone"
-        [| listId |]
-        RequestHideDoneSuccess
-        (fun _ -> GetItems)
-    | RequestHideDoneSuccess hideDone ->
-      { state with HideDone = hideDone }, Cmd.ofMsg GetItems
-    | SaveHideDone ->
-      let listId = defaultArg state.TrackListId "X"
+          childContent [
+            LabelBuilder() {
+              class' "paper-check"
 
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.SaveHideDone"
-        [| listId; state.HideDone |]
-        (fun _ -> SaveHideDoneSuccess)
-        Error
-    | SaveHideDoneSuccess -> state, Cmd.none
-    | GetItems ->
-      match state.TrackListId with
-      | Some listId ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.GetListItems"
-          [| listId; state.HideDone |]
-          GetItemsSuccess
-          Error
-      | None -> emptyListId
-    | GetItemsSuccess list ->
-      { state with
-          Items =
-            list
-            |> Seq.sortBy (fun item -> item.Name)
-            |> List.ofSeq },
-      Cmd.none
-    | ValidateItem item ->
-      match state.TrackListId with
-      | Some listid ->
-        let onSuccess nameExists = ValidateItemSuccess(nameExists, item)
+              childContent [
+                input () {
+                  type' "checkbox"
+                  class' "listitem-item-checkbox"
+                  id item.Id
+                  key item.Id
+                  checked' item.IsDone
 
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.ListItemExists"
-          [| listid; state.CurrentItem |]
-          onSuccess
-          Error
-      | None -> emptyListId
-    | ValidateItemSuccess (nameExists, itemName) ->
-      let canAdd = not nameExists && itemName.Length <> 0
+                  onchangeAsync (fun _ ->
+                    onItemUpdate ({ item with IsDone = not <| item.IsDone }))
+                }
+                SpanBuilder() { childContent "" }
+              ]
+            }
+            input () {
+              value item.Name
 
-      { state with
-          CanAddCurrentItem = canAdd },
-      Cmd.none
+              oninputAsync (fun event ->
+                async {
+                  match! canAddItem (unbox event.Value) with
+                  | true ->
+                    return!
+                      onItemUpdate ({ item with Name = unbox event.Value })
+                  | false -> ()
+                })
+            }
+            button () {
+              class' "paper-btn btn-small btn-danger-outline m-0"
+              onclick (fun _ -> onItemDelete item)
+              childContent (Icon.Get Trash None)
+            }
+          ]
+        }
+      ]
+    }
 
-    | CreateItem item ->
-      match state.TrackListId with
-      | Some listid ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.CreateListItem"
-          [| listid; item |]
-          CreateItemSuccess
-          Error
-      | None -> emptyListId
-    | CreateItemSuccess item ->
-      { state with
-          Items =
-            (item :: state.Items)
-            |> List.sortBy (fun item -> item.Name) },
-      Cmd.none
-    | UpdateItemProp (item, prop) ->
-      match prop with
-      | IsDone isDone ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.UpdateListItem"
-          [| { item with IsDone = isDone } |]
-          UpdateItemPropSuccess
-          Error
-      | Name name ->
-        state, Cmd.ofMsg (ValidateExisting { item with Name = name })
-    | ValidateExisting item ->
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.ListItemExists"
-        [| item.ListId; item.Name |]
-        (fun exists -> ValidateExistingSuccess(exists, item))
-        Error
-    | ValidateExistingSuccess (exists, item) ->
-      match exists with
-      | true -> state, Cmd.none
-      | false ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.UpdateListItem"
-          [| item |]
-          UpdateItemPropSuccess
-          Error
-    | UpdateItemPropSuccess item ->
-      let items =
-        match state.HideDone, item.IsDone with
+  let private toolbar
+    onToShare
+    onToClipboard
+    onGoBack
+    canShare
+    (hideDoneCheckbox: Bolero.Node)
+    (tracklistId: string)
+    =
+
+    div () {
+      class' "border"
+
+      childContent [
+        section () {
+          class' "column-center"
+
+          childContent [
+            h4 () { childContent tracklistId }
+            fieldset () {
+              class' "form-group"
+              childContent hideDoneCheckbox
+            }
+          ]
+        }
+        section () {
+          class' "row flex-center"
+
+          childContent [
+            button () {
+              class' "paper-btn btn-small"
+              onclick onGoBack
+              childContent (Icon.Get Back None)
+            }
+            if canShare then
+              button () {
+                class' "paper-btn btn-small"
+                onclick onToShare
+                childContent (Icon.Get Share None)
+              }
+            button () {
+              class' "paper-btn btn-small"
+              onclick onToClipboard
+              childContent (Icon.Get Copy None)
+            }
+
+            ]
+        }
+      ]
+    }
+
+  let private _view
+    (canShare: bool)
+    (tracklistId: string)
+    (hook: IComponentHook,
+     listItems: ITrackListItemService,
+     lists: ITrackListService,
+     nav: NavigationManager)
+    =
+    let hideDone = hook.UseStore false
+    let items = hook.UseStore []
+    let isDeleting = hook.UseStore None
+
+    let onDeleteModalResult item (result: Result<bool, unit>) =
+      match result with
+      | Ok true ->
+        async {
+          let! result = listItems.Delete item |> Async.AwaitTask
+
+          items.Current
+          |> List.filter (fun item -> item.Id <> result.Id)
+          |> items.Publish
+
+          isDeleting.Publish None
+        }
+        |> Async.Start
+      | Ok false
+      | Error _ -> isDeleting.Publish(None)
+
+    let deleteModal (item: TrackListItem option) =
+
+      match item with
+      | Some item ->
+        let title = "Borrar Elemento"
+        let subtitle = "esta operacion es irreversible"
+
+        let txt =
+          sprintf """Proceder con el borrado de "%s"?""" item.Name
+
+        Modals.DeleteResourceModal
+          (title, subtitle, txt)
+          true
+          (onDeleteModalResult item)
+      | None -> html.none
+
+    let canAddItem name =
+      async {
+        let! itemExists =
+          listItems.Exists(tracklistId, name)
+          |> Async.AwaitTask
+
+        return not itemExists
+      }
+
+    let onItemUpdate item =
+      async {
+        let! result = listItems.Update item |> Async.AwaitTask
+
+        match hideDone.Current, result.IsDone with
         | true, true ->
-          state.Items
-          |> List.filter (fun i -> i.Id <> item.Id)
+
+          items.Current
+          |> List.filter (fun item -> item.Id <> result.Id)
+          |> items.Publish
         | _ ->
-          state.Items
-          |> List.map (fun i -> if i.Id = item.Id then item else i)
+          let newItems =
+            items.Current
+            |> List.map (fun item ->
+              if item.Id <> result.Id then
+                item
+              else
+                result)
 
+          items.Publish newItems
+      }
 
-      { state with
-          Items = items |> List.sortBy (fun item -> item.Name) },
-      Cmd.none
-    | ShowConfirmDeleteModal show ->
-      { state with
-          ShowConfirmDeleteModal = show },
-      Cmd.none
-    | ShowConfirmDeleteModalAction (item, result) ->
-      let cmd =
-        match result with
-        | Ok result when result -> Cmd.ofMsg (DeleteItem item)
-        | _ -> Cmd.ofMsg (ShowConfirmDeleteModal None)
+    let onItemCreate item =
+      async {
+        let! result =
+          listItems.Create(tracklistId, item)
+          |> Async.AwaitTask
 
-      state, cmd
-    | DeleteItem item ->
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.DeleteListItem"
-        [| item |]
-        DeleteItemSuccess
-        Error
-    | DeleteItemSuccess item ->
-      let items =
-        state.Items
-        |> List.filter (fun i -> i.Id <> item.Id)
-        |> List.sortBy (fun item -> item.Name)
+        items.Publish (fun items ->
+          (result :: items)
+          |> List.sortBy (fun item -> item.Name))
+      }
 
-      { state with
-          Items = items
-          ShowConfirmDeleteModal = None },
-      Cmd.none
+    let onItemDelete item = isDeleting.Publish(Some item)
 
-    | ShareRequest items ->
-      let stringified = stringifyItems items
-      let idValue = defaultArg state.TrackListId "Mandadin"
+    let onHideDone areHidden =
+      async {
+        let! result =
+          lists.SaveHideDone(tracklistId, areHidden)
+          |> Async.AwaitTask
 
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Share.ShareContent"
-        [| idValue; stringified |]
-        (fun _ -> ShareRequestSuccess)
-        Error
-    | ShareRequestSuccess -> state, Cmd.none
-    | ToClipboard items ->
-      let stringified = stringifyItems items
+        hideDone.Publish areHidden
 
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Clipboard.CopyTextToClipboard"
-        [| stringified |]
-        (fun _ -> ShareRequestSuccess)
-        Error
-    | ToClipboardSuccess -> state, Cmd.none
-    | Error ex ->
-      eprintfn "Update Error [%s]" ex.Message
-      state, Cmd.none
+        match result.hideDone with
+        | true ->
+          let filterOutDone item = not item.IsDone
 
-  let private newItemForm (state: State) (dispatch: Dispatch<Msg>) =
-    let currentContentTxt = "Nombre del objeto..."
+          items.Current
+          |> List.filter filterOutDone
+          |> items.Publish
+        | false ->
+          let! result =
+            listItems.Find(tracklistId, false)
+            |> Async.AwaitTask
 
-    form [ attr.``class`` "row flex-spaces background-muted border notes-form"
-           on.submit (fun _ -> CreateItem state.CurrentItem |> dispatch) ] [
-      fieldset [ attr.``class`` "form-group" ] [
-        label [ attr.``for`` "current-content" ] [
-          text currentContentTxt
-        ]
-        textarea [ attr.id "current-content"
-                   attr.placeholder currentContentTxt
-                   bind.input.string
-                     state.CurrentItem
-                     (SetCurrentItem >> dispatch) ] []
-        label [ attr.``for`` "paperCheck1"
-                attr.``class`` "paper-check" ] [
-          input [ attr.id "paperCheck1"
-                  attr.name "paperChecks"
-                  attr.``type`` "checkbox"
-                  bind.``checked`` state.HideDone (HideDone >> dispatch) ]
-          span [] [
-            text "Esconder Terminados"
+          result
+          |> List.sortBy (fun item -> item.Name)
+          |> items.Publish
+      }
+
+    let onToShare _ =
+      listItems.ShareItems(tracklistId, items.Current)
+      |> Async.AwaitTask
+      |> Async.Ignore
+      |> Async.Start
+
+    let onToClipboard _ =
+      listItems.SendToClipboard items.Current
+      |> Async.AwaitTask
+      |> Async.Ignore
+      |> Async.Start
+
+    let onGoBack _ = nav.NavigateTo("/")
+
+    hook.OnInitialized
+    |> Observable.map (fun _ -> lists.GetHideDone tracklistId)
+    |> Observable.switchTask
+    |> Observable.map (fun result ->
+      hideDone.Publish result
+      listItems.Find(tracklistId, result))
+    |> Observable.switchTask
+    |> Observable.subscribe (fun result ->
+      items.Publish(result |> List.sortBy (fun item -> item.Name)))
+    |> hook.AddDispose
+
+    adaptiview () {
+      let! hideDone = hook.UseAVal hideDone
+      let! items = hook.UseAVal items
+
+      let hideDoneCheckbox =
+        LabelBuilder() {
+          for' "paperCheck1"
+          class' "paper-check"
+
+          childContent [
+            input () {
+              id "paperCheck1"
+              name "paperCheck"
+              type' "checkbox"
+              checked' hideDone
+              onchangeAsync (fun _ -> onHideDone (not <| hideDone))
+            }
+            SpanBuilder() { childContent "Esconder Terminados" }
           ]
+        }
+
+      article () {
+        childContent [
+          toolbar
+            onToShare
+            onToClipboard
+            onGoBack
+            canShare
+            hideDoneCheckbox
+            tracklistId
+          newItemForm canAddItem onItemCreate
+          html.watch (isDeleting, deleteModal)
+          ul () {
+            class' "tracklist-list"
+
+            childContent (
+              Virtualize'() {
+                Items(items |> Array.ofList)
+                ChildContent(listItem canAddItem onItemUpdate onItemDelete)
+              }
+            )
+          }
         ]
-      ]
-      button [ attr.``type`` "submit"
-               attr.``class`` "paper-btn btn-small"
-               attr.disabled (not state.CanAddCurrentItem) ] [
-        Icon.Get Save None
-      ]
-    ]
+      }
+    }
 
-  let private listItem (dispatch: Dispatch<Msg>) (item: TrackListItem) =
-    li [ attr.``class`` "listitem-item"
-         attr.key item.Id ] [
-      input [ attr.``type`` "checkbox"
-              attr.``class`` "listitem-item-checkbox"
-              attr.id item.Id
-              bind.``checked``
-                item.IsDone
-                (fun isDone ->
-                  UpdateItemProp(item, (IsDone isDone)) |> dispatch) ]
-      input [ bind.input.string
-                item.Name
-                (fun name ->
-                  ValidateExisting { item with Name = name }
-                  |> dispatch) ]
-      button [ attr.``class`` "paper-btn btn-small btn-danger-outline m-0"
-               on.click (fun _ -> ShowConfirmDeleteModal(Some item) |> dispatch) ] [
-        Icon.Get Trash None
-      ]
-    ]
-
-  let toolbar (state: State) (dispatch: Dispatch<Msg>) =
-    let getId = defaultArg state.TrackListId ""
-
-    div [ attr.``class`` "border" ] [
-      section [ attr.``class`` "row flex-center" ] [
-        h4 [] [ text getId ]
-      ]
-      section [ attr.``class`` "row flex-center" ] [
-        button [ attr.``class`` "paper-btn btn-small"
-                 on.click (fun _ -> dispatch GoBack) ] [
-          Icon.Get Back None
-        ]
-        if state.CanShare then
-          button [ attr.``class`` "paper-btn btn-small"
-                   on.click (fun _ -> ShareRequest state.Items |> dispatch) ] [
-            Icon.Get Share None
-          ]
-        button [ attr.``class`` "paper-btn btn-small"
-                 on.click (fun _ -> ToClipboard state.Items |> dispatch) ] [
-          (Icon.Get Copy None)
-        ]
-      ]
-    ]
-
-  let view (state: State) (dispatch: Dispatch<Msg>) =
-    let deleteModal (item: TrackListItem) =
-      let title = "Borrar Elemento"
-      let subtitle = "esta operacion es irreversible"
-
-      let txt =
-        sprintf """Proceder con el borrado de "%s"?""" item.Name
-
-      let showModal = state.ShowConfirmDeleteModal.IsSome
-
-      Modals.DeleteResourceModal
-        (title, subtitle, txt)
-        showModal
-        (fun result ->
-          ShowConfirmDeleteModalAction(item, result)
-          |> dispatch)
-
-    article [] [
-      toolbar state dispatch
-      newItemForm state dispatch
-      if state.ShowConfirmDeleteModal.IsSome then
-        deleteModal state.ShowConfirmDeleteModal.Value
-      ul [ attr.``class`` "tracklist-list" ] [
-        comp<Virtualize<TrackListItem>>
-          [ "Items" => ResizeArray(state.Items)
-            attr.fragmentWith "ChildContent" (listItem dispatch) ]
-          []
-      ]
-    ]
-
-
-  type Page() =
-    inherit ProgramComponent<State, Msg>()
-
-    [<Parameter>]
-    member val OnBackRequested: Option<unit -> unit> = None with get, set
-
-    [<Parameter>]
-    member val ListId: Option<string> = None with get, set
-
-    [<Parameter>]
-    member val CanShare: bool = false with get, set
-
-    override this.Program =
-      let init _ = init this.ListId this.CanShare
-
-      let update msg state =
-        update msg state this.OnBackRequested this.JSRuntime
-
-      Program.mkProgram init update view
-#if DEBUG
-      |> Program.withConsoleTrace
-#endif
+  let View canShare tracklistId =
+    html.inject ("mandadin-tracklist-items-view", _view canShare tracklistId)

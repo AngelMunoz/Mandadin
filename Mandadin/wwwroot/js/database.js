@@ -408,16 +408,16 @@ export function GetHideDone(listId) {
  * @returns {Promise<{_id: string; _rev: string; hideDone: boolean}>}
  */
 export async function SaveHideDone(listId, hideDone) {
-  const { _id, _rev } = await HideDone.get(listId);
+  const { _id, _rev } = await HideDone.get(listId)
+    .catch(saveHideDoneError => {
+      if (saveHideDoneError.status === 404) {
+        return HideDone.put({ _id: listId, hideDone }).then(res => ({ _id: res.id, _rev: res.rev }));
+      }
+      console.warn({ saveHideDoneError });
+      return Promise.reject(saveHideDoneError.message);
+    });
   const result =
     await HideDone.put({ _id, _rev, hideDone })
-      .catch(saveHideDoneError => {
-        if (saveHideDoneError.status === 404) {
-          return HideDone.put({ _id: listId, hideDone });
-        }
-        console.warn({ saveHideDoneError });
-        return Promise.reject(saveHideDoneError.message);
-      })
       .catch(saveHideDoneError => {
         console.warn({ saveHideDoneError });
         return Promise.reject(saveHideDoneError.message);

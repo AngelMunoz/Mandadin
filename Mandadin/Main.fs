@@ -3,7 +3,6 @@ namespace Mandadin
 open System
 open Microsoft.AspNetCore.Components
 open FSharp.Control.Reactive
-open Bolero
 open Fun.Blazor
 open Fun.Blazor.Router
 open Mandadin
@@ -29,62 +28,39 @@ module Main =
       printfn $"{num}"
       "Hola!"
 
-  let private listViewDetail
-    (canShare: bool)
-    (onBackRequested: unit -> unit)
-    (listId: string)
-    =
-    Html.comp<ListItems.Page>
-      [ "ListId" => Some listId
-        "CanShare" => canShare
-        "OnBackRequested" => Some(onBackRequested) ]
-      []
-
-  let private navigateToRoute
-    (title: IStore<string>)
-    (nav: NavigationManager)
-    (listId: string)
-    =
-    title.Publish $"{listId} | Mandadin"
-    nav.NavigateTo($"/lists/{listId}")
-
-  let private navigateToLists
-    (title: IStore<string>)
-    (nav: NavigationManager)
-    _
-    =
-    title.Publish $"{getGreeting ()} | Mandadin"
-    nav.NavigateTo("/")
-
   let View () =
     let _view
       (
         hook: IComponentHook,
         share: IShareService,
-        theme: IThemeService,
-        nav: NavigationManager
+        theme: IThemeService
       ) =
       let appTitle = hook.UseStore(getGreeting ())
       let hasOverlay = hook.UseStore false
       let canShare = hook.UseStore false
 
-      hook.OnInitialized.Subscribe
-        (fun () ->
-          [ share.GetCanShare()
-            |> Observable.ofTask
-            |> Observable.subscribe canShare.Publish
+      hook.OnFirstAfterRender.Subscribe (fun _ ->
+        theme.SetDocumentTitle(getGreeting ())
+        |> Async.AwaitTask
+        |> Async.Start)
+      |> hook.AddDispose
 
-            theme.HasOverlayControls()
-            |> Observable.ofTask
-            |> Observable.subscribe hasOverlay.Publish
+      hook.OnInitialized.Subscribe (fun () ->
+        [ share.GetCanShare()
+          |> Observable.ofTask
+          |> Observable.subscribe canShare.Publish
 
-            appTitle.Observable
-            |> Observable.map theme.SetDocumentTitle
-            |> Observable.switchTask
-            |> Observable.subscribe ignore
+          theme.HasOverlayControls()
+          |> Observable.ofTask
+          |> Observable.subscribe hasOverlay.Publish
 
-            ]
-          |> hook.AddDisposes)
+          appTitle.Observable
+          |> Observable.map theme.SetDocumentTitle
+          |> Observable.switchTask
+          |> Observable.subscribe ignore
+
+          ]
+        |> hook.AddDisposes)
       |> hook.AddDispose
 
       adaptiview () {
@@ -109,9 +85,7 @@ module Main =
               childContent [
                 html.route [
                   routeCi "/" (Lists.View())
-                  routeCif
-                    "/lists/%s"
-                    (listViewDetail canShare (navigateToLists appTitle nav))
+                  routeCif "/lists/%s" (ListItems.View canShare)
                   routeCi "/notes" (Notes.View canShare)
                   routeCi "/import" (Import.View())
                 ]

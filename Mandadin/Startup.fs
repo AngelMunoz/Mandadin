@@ -1,4 +1,5 @@
 open System
+open Microsoft.AspNetCore.Components
 open Microsoft.AspNetCore.Components.WebAssembly.Hosting
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.JSInterop
@@ -12,7 +13,7 @@ builder
   .Services.AddFunBlazor()
 |> ignore
 
-let getService<'Service> (services: IServiceProvider) =
+let inline getService<'Service> (services: IServiceProvider) =
   services.GetService<'Service>()
 
 // get the service and combine the result into the GetService from the modules
@@ -27,6 +28,7 @@ builder
     >> TrackListService.GetService
   )
   .AddScoped<INoteService>(getService<IJSRuntime> >> NoteService.GetService)
+  .AddScoped<IRoutingService>(getService<NavigationManager> >> Navigation.GetService)
   .AddScoped<ITrackListItemService>(fun services ->
     (getService<IJSRuntime> services,
      getService<IShareService> services,
