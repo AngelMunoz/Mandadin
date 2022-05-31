@@ -1,5 +1,7 @@
 # Mandadin 4
 
+> ***DISCLAIMER***: This was written a last year, my actual thoughts on wasm have changed slightly but I will keep this README as is just to capture my feelings at the moment, I'm likely to re-write this at some point
+
 The 4th version because how else I'm I ever going to learn languages and stacks...
 
 
