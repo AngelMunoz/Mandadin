@@ -11,10 +11,11 @@ open Microsoft.AspNetCore.Components
 
 [<RequireQualifiedAccess>]
 module Import =
+  open System
 
   let parseContentString (content: string) : array<array<obj>> =
     let parseRow (row: string) =
-      let split = row.Split(" ] ")
+      let split = row.Split("] ")
 
       let isDone =
         match split |> Array.tryItem 0 with
@@ -35,7 +36,8 @@ module Import =
       Title: string
       Url: string }
 
-  type State = { ShareData: Option<ShareDataPayload> }
+  type State =
+    { ShareData: ValueOption<ShareDataPayload> }
 
 
   type Msg =
@@ -48,80 +50,96 @@ module Import =
 
 
   let private init (_: 'arg) =
-    { ShareData = None }, Cmd.ofMsg RequestImportData
+    { ShareData = ValueNone }, Cmd.ofMsg RequestImportData
 
 
   let private update
     (msg: Msg)
     (state: State)
-    (goToList: Option<string -> unit>)
+    (goToList: string -> unit)
     (js: IJSRuntime)
     =
     match msg with
     | RequestImportData ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Share.ImportShareData"
-          [||]
-          RequestImportDataSuccess
-          Error
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Share.ImportShareData"
+        [||]
+        RequestImportDataSuccess
+        Error
     | RequestImportDataSuccess data ->
-        let share = Some data
-        { state with ShareData = share }, Cmd.none
+      let share = ValueSome data
+      { state with ShareData = share }, Cmd.none
     | ImportResult result ->
-        match result with
-        | Ok (title, content) ->
-            let items = parseContentString content
-            state, Cmd.ofMsg (CreateFromImport(title, items))
-        | Result.Error () ->
+      match result with
+      | Ok(title, content) ->
+        let items = parseContentString content
+        state, Cmd.ofMsg (CreateFromImport(title, items))
+      | Result.Error() ->
 
-            { state with ShareData = None }, Cmd.none
-    | CreateFromImport (title, items) ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.ImportList"
-          [| title; items |]
-          CreateListSuccess
-          Error
+        { state with ShareData = ValueNone }, Cmd.none
+    | CreateFromImport(title, items) ->
+      state,
+      Cmd.OfJS.either
+        js
+        "Mandadin.Database.ImportList"
+        [| title; items |]
+        CreateListSuccess
+        Error
     | CreateListSuccess trackList ->
-        goToList
-        |> Option.iter (fun goToList -> goToList trackList.Id)
-
-        state, Cmd.none
+      goToList trackList.Id
+      state, Cmd.none
     | Error err ->
-        eprintfn "%O" err
-        { state with ShareData = None }, Cmd.none
+      eprintfn "%O" err
+      { state with ShareData = ValueNone }, Cmd.none
 
   let view (state: State) (dispatch: Dispatch<Msg>) =
     let data =
       state.ShareData
-      |> Option.defaultValue ({ Title = ""; Text = ""; Url = "" })
+      |> ValueOption.defaultValue ({ Title = ""; Text = ""; Url = "" })
 
-    article [] [
-      a [ attr.href "/"
-          attr.``class`` "paper-btn btn-small" ] [
+    article {
+      a {
+        attr.href "/"
         Icon.Get Back None
-      ]
-      if state.ShareData.IsNone then
-        p [] [
-          text
-            "No pudimos obtener informacion de lo que nos querias compartir 😢"
-        ]
-      Modals.ImportTrackList
-        state.ShareData.IsSome
-        (ImportResult >> dispatch)
-        (Some data.Title)
-        (Some data.Text)
-    ]
+      }
+
+      cond state.ShareData.IsNone
+      <| function
+        | true ->
+          p {
+            text
+              "No pudimos obtener informacion de lo que nos querias compartir 😢"
+          }
+        | false -> empty ()
+
+      cond state.ShareData
+      <| function
+        | ValueSome data ->
+          let prefill: Modals.Import.ImportData =
+            { title = data.Title
+              content = data.Text }
+
+          comp<Modals.Import.ImportTrackList> {
+            "ImportData" => prefill
+
+            "OnDismiss"
+            => fun _ -> dispatch (ImportResult(Result.Error()))
+
+            "OnImport"
+            => fun (data: Modals.Import.ImportData) ->
+              dispatch (ImportResult(Ok(data.title, data.content)))
+          }
+        | ValueNone -> empty ()
+    }
 
 
   type Page() as this =
     inherit ProgramComponent<State, Msg>()
 
     [<Parameter>]
-    member val OnGoToListRequested: Option<string -> unit> = None with get, set
+    member val OnGoToListRequested: string -> unit = ignore with get, set
 
     override _.Program =
       let update msg state =

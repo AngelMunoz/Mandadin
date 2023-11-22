@@ -54,7 +54,7 @@ module Notes =
     match msg with
     | SetCurrentContent content ->
       { state with CurrentContent = content }, Cmd.none
-    | DeleteNote (noteid, rev) ->
+    | DeleteNote(noteid, rev) ->
       state,
       Cmd.OfJS.either
         js
@@ -105,12 +105,11 @@ module Notes =
     | UpdateNoteSuccess updated ->
       let notes =
         state.Notes
-        |> List.map
-             (fun note ->
-               if note.Id = updated.Id then
-                 updated
-               else
-                 note)
+        |> List.map (fun note ->
+          if note.Id = updated.Id then
+            updated
+          else
+            note)
 
       { state with
           Notes = notes
@@ -158,59 +157,88 @@ module Notes =
     let submitBtnTxt = "Guardar"
     let currentContentTxt = "Escribe algo..."
 
-    form [ attr.``class`` "row flex-spaces background-muted border notes-form"
-           on.submit (fun _ -> CreateNote(state.CurrentContent) |> dispatch) ] [
-      fieldset [ attr.``class`` "form-group" ] [
-        label [ attr.``for`` "current-content" ] [
+    form {
+      attr.``class`` "row flex-spaces background-muted border notes-form"
+      on.submit (fun _ -> CreateNote(state.CurrentContent) |> dispatch)
+
+      fieldset {
+        attr.``class`` "form-group"
+
+        label {
+          attr.``for`` "current-content"
           text currentContentTxt
-        ]
-        textarea [ attr.id "current-content"
-                   attr.placeholder currentContentTxt
-                   bind.input.string
-                     state.CurrentContent
-                     (SetCurrentContent >> dispatch) ] []
-      ]
-      button [ attr.``type`` "submit"
-               attr.disabled (state.CurrentContent.Length = 0) ] [
-        Icon.Get Save None
-      ]
-      button [ attr.``type`` "button"
-               on.click (fun _ -> FromClipboard |> dispatch) ] [
+        }
+
+        textarea {
+          attr.id "current-content"
+          attr.placeholder currentContentTxt
+          bind.input.string state.CurrentContent (SetCurrentContent >> dispatch)
+        }
+      }
+
+      button {
+        attr.``type`` "submit"
+        attr.disabled (state.CurrentContent.Length = 0)
+        text submitBtnTxt
+      }
+
+      button {
+        attr.``type`` "button"
+        on.click (fun _ -> FromClipboard |> dispatch)
         Icon.Get Clipboard None
-      ]
-    ]
+      }
+    }
 
   let private noteItem (item: Note) (canShare: bool) (dispatch: Dispatch<Msg>) =
-    li [ attr.``class`` "note-list-item m-05" ] [
-      textarea [ bind.input.string
-                   item.Content
-                   (fun text ->
-                     dispatch (UpdateNote { item with Content = text })) ] []
-      section [ attr.``class`` "row" ] [
-        button [ attr.``class`` "paper-btn btn-small btn-muted-outline"
-                 on.click (fun _ -> ToClipboard item |> dispatch) ] [
-          (Icon.Get Copy None)
-        ]
-        if canShare then
-          button [ attr.``class`` "paper-btn btn-small btn-muted-outline"
-                   on.click (fun _ -> ShareContent item |> dispatch) ] [
-            Icon.Get Share None
-          ]
-        button [ attr.``class`` "paper-btn btn-small btn-danger-outline"
-                 on.click (fun _ -> DeleteNote(item.Id, item.Rev) |> dispatch) ] [
-          Icon.Get Trash None
-        ]
-      ]
-    ]
+    li {
+      attr.``class`` "note-list-item m-05"
+
+      textarea {
+        bind.input.string item.Content (fun text ->
+          dispatch (UpdateNote { item with Content = text }))
+
+        section {
+          attr.``class`` "row"
+
+          button {
+            attr.``class`` "paper-btn btn-small btn-muted-outline"
+            on.click (fun _ -> ToClipboard item |> dispatch)
+            Icon.Get Copy None
+          }
+
+          cond canShare
+          <| function
+            | false -> empty ()
+            | true ->
+              button {
+                attr.``class`` "paper-btn btn-small btn-muted-outline"
+                on.click (fun _ -> ShareContent item |> dispatch)
+                Icon.Get Share None
+              }
+
+          button {
+            attr.``class`` "paper-btn btn-small btn-danger-outline"
+            on.click (fun _ -> DeleteNote(item.Id, item.Rev) |> dispatch)
+            Icon.Get Trash None
+          }
+        }
+      }
+    }
 
   let view (state: State) (dispatch: Dispatch<Msg>) =
-    article [] [
+    article {
       newNoteForm state dispatch
-      ul [ attr.``class`` "notes-list" ] [
-        for item in state.Notes do
+
+      ul {
+        attr.``class`` "notes-list"
+
+        virtualize.comp {
+          virtualize.placeholder (fun _ -> div { text "Cargando..." })
+          let! item = virtualize.items state.Notes
           noteItem item state.CanShare dispatch
-      ]
-    ]
+        }
+      }
+    }
 
 
   type Page() as this =

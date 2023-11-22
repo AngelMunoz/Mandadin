@@ -11,6 +11,44 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(blat|dll|webcil|dat)",
+        "headers": [
+          {
+            "key": "content-type",
+            "value": "application/octet-stream"
+          }
+        ]
+      },
+      {
+        "source": "**/*.wasm",
+        "headers": [
+          {
+            "key": "content-type",
+            "value": "application/wasm"
+          }
+        ]
+      },
+      {
+        "source": "**/*.json",
+        "headers": [
+          {
+            "key": "content-type",
+            "value": "application/json"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(woff|woff2)",
+        "headers": [
+          {
+            "key": "content-type",
+            "value": "application/font-woff"
+          }
+        ]
+      }
     ]
   }
 }

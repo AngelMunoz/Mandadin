@@ -2,13 +2,16 @@
   --fallback-title-bar-height: 40px;
 }
 
-html, body {
+html,
+body {
   padding: 0;
   margin: 0;
   background-color: var(--main-background, #41403e);
 }
 
-nav .bar1, nav .bar2, nav .bar3 {
+nav .bar1,
+nav .bar2,
+nav .bar3 {
   height: 2px;
 }
 
@@ -24,10 +27,12 @@ article.mandadin {
 }
 
 header.mandadin-title-bar {
-    app-region: drag;
+  app-region: drag;
   /* Pre-fix app-region during standardization process */
   -webkit-app-region: drag;
-  height: calc(env(titlebar-area-height, var(--fallback-title-bar-height)) + 2px);
+  height: calc(
+    env(titlebar-area-height, var(--fallback-title-bar-height)) + 2px
+  );
   display: flex;
   justify-content: center;
   position: sticky;
@@ -66,6 +71,7 @@ nav.mandadin-navbar {
   flex-wrap: wrap;
   align-content: center;
   align-items: center;
+  overflow-y: auto;
 }
 .note-list-item {
   display: flex;
@@ -79,6 +85,7 @@ nav.mandadin-navbar {
   flex-wrap: wrap;
   padding: 0;
   margin: 0.5em 0;
+  overflow-y: auto;
 }
 
 .tracklist-item {
@@ -104,7 +111,6 @@ nav.mandadin-navbar {
     padding: 0;
   }
 }
-
 
 ul.notes-list li::before,
 .tracklist-list li::before {
@@ -143,18 +149,17 @@ ul.notes-list li::before,
 
 /* Small devices (landscape phones, 576px and up) */
 @media (max-width: 576px) {
-  
-  .modal-state:checked+.modal .modal-body {
+  .modal-state:checked + .modal .modal-body {
     margin-top: 12vh;
   }
   .hidden-on-mobile {
     display: none;
   }
- }
+}
 
 /* Medium devices (tablets, 768px and up) */
-@media (max-width: 768px) { 
+@media (max-width: 768px) {
   .hidden-on-mobile {
     display: initial;
   }
- }
+}

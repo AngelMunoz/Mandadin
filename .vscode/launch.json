@@ -1,0 +1,19 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "blazorwasm",
+            "name": "Bolero App",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Mandadin.Client/bin/Debug/net8.0/Mandadin.Client.dll",
+            "url": "http://localhost:5000",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
+        }
+    ]
+}

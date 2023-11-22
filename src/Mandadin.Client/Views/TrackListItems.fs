@@ -7,7 +7,6 @@ open Bolero.Html
 open Bolero.Remoting.Client
 open Mandadin.Client
 open Microsoft.AspNetCore.Components
-open Microsoft.AspNetCore.Components.Web.Virtualization
 
 
 [<RequireQualifiedAccess>]
@@ -18,19 +17,19 @@ module ListItems =
     let stringified =
       items
       |> Array.ofList
-      |> Array.Parallel.map
-           (fun item -> sprintf "[ %c ] %s" (isDoneToX item.IsDone) item.Name)
+      |> Array.Parallel.map (fun item ->
+        sprintf "[ %c ] %s" (isDoneToX item.IsDone) item.Name)
 
     System.String.Join('\n', stringified)
 
   type State =
     { Items: list<TrackListItem>
-      TrackListId: Option<string>
+      TrackListId: ValueOption<string>
       CurrentItem: string
       CanAddCurrentItem: bool
       HideDone: bool
       CanShare: bool
-      ShowConfirmDeleteModal: Option<TrackListItem> }
+      ShowConfirmDeleteModal: ValueOption<TrackListItem> }
 
 
   type UpdatableItemProp =
@@ -58,7 +57,7 @@ module ListItems =
     | CreateItem of string
     | CreateItemSuccess of TrackListItem
 
-    | ShowConfirmDeleteModal of Option<TrackListItem>
+    | ShowConfirmDeleteModal of ValueOption<TrackListItem>
     | ShowConfirmDeleteModalAction of TrackListItem * Result<bool, unit>
 
     | ShareRequest of list<TrackListItem>
@@ -78,20 +77,20 @@ module ListItems =
     | Error of exn
 
 
-  let init (listId: Option<string>) (canShare: bool) =
+  let init (listId: ValueOption<string>) (canShare: bool) =
     { Items = []
       TrackListId = listId
       HideDone = false
       CurrentItem = ""
       CanAddCurrentItem = false
       CanShare = canShare
-      ShowConfirmDeleteModal = None },
+      ShowConfirmDeleteModal = ValueNone },
     Cmd.batch [ Cmd.ofMsg RequestHideDone ]
 
   let update
     (msg: Msg)
     (state: State)
-    (onGoBackRequested: Option<unit -> unit>)
+    (onGoBackRequested: unit -> unit)
     (js: IJSRuntime)
     =
     let emptyListId =
@@ -99,19 +98,18 @@ module ListItems =
 
     match msg with
     | GoBack ->
-      match onGoBackRequested with
-      | Some onGoBackRequested ->
-        onGoBackRequested ()
-        state, Cmd.none
-      | None -> state, Cmd.none
+      onGoBackRequested ()
+      state, Cmd.none
     | HideDone hide ->
       { state with HideDone = hide },
-      Cmd.batch [ Cmd.ofMsg GetItems
-                  Cmd.ofMsg SaveHideDone ]
+      Cmd.batch
+        [ Cmd.ofMsg GetItems
+          Cmd.ofMsg SaveHideDone ]
     | SetCurrentItem item ->
       { state with CurrentItem = item }, Cmd.ofMsg (ValidateItem(item))
     | RequestHideDone ->
-      let listId = defaultArg state.TrackListId "X"
+      let listId =
+        defaultValueArg state.TrackListId "X"
 
       state,
       Cmd.OfJS.either
@@ -123,7 +121,8 @@ module ListItems =
     | RequestHideDoneSuccess hideDone ->
       { state with HideDone = hideDone }, Cmd.ofMsg GetItems
     | SaveHideDone ->
-      let listId = defaultArg state.TrackListId "X"
+      let listId =
+        defaultValueArg state.TrackListId "X"
 
       state,
       Cmd.OfJS.either
@@ -135,7 +134,7 @@ module ListItems =
     | SaveHideDoneSuccess -> state, Cmd.none
     | GetItems ->
       match state.TrackListId with
-      | Some listId ->
+      | ValueSome listId ->
         state,
         Cmd.OfJS.either
           js
@@ -143,7 +142,7 @@ module ListItems =
           [| listId; state.HideDone |]
           GetItemsSuccess
           Error
-      | None -> emptyListId
+      | ValueNone -> emptyListId
     | GetItemsSuccess list ->
       { state with
           Items =
@@ -153,7 +152,7 @@ module ListItems =
       Cmd.none
     | ValidateItem item ->
       match state.TrackListId with
-      | Some listid ->
+      | ValueSome listid ->
         let onSuccess nameExists = ValidateItemSuccess(nameExists, item)
 
         state,
@@ -163,9 +162,10 @@ module ListItems =
           [| listid; state.CurrentItem |]
           onSuccess
           Error
-      | None -> emptyListId
-    | ValidateItemSuccess (nameExists, itemName) ->
-      let canAdd = not nameExists && itemName.Length <> 0
+      | ValueNone -> emptyListId
+    | ValidateItemSuccess(nameExists, itemName) ->
+      let canAdd =
+        not nameExists && itemName.Length <> 0
 
       { state with
           CanAddCurrentItem = canAdd },
@@ -173,7 +173,7 @@ module ListItems =
 
     | CreateItem item ->
       match state.TrackListId with
-      | Some listid ->
+      | ValueSome listid ->
         state,
         Cmd.OfJS.either
           js
@@ -181,14 +181,14 @@ module ListItems =
           [| listid; item |]
           CreateItemSuccess
           Error
-      | None -> emptyListId
+      | ValueNone -> emptyListId
     | CreateItemSuccess item ->
       { state with
           Items =
             (item :: state.Items)
             |> List.sortBy (fun item -> item.Name) },
       Cmd.none
-    | UpdateItemProp (item, prop) ->
+    | UpdateItemProp(item, prop) ->
       match prop with
       | IsDone isDone ->
         state,
@@ -208,7 +208,7 @@ module ListItems =
         [| item.ListId; item.Name |]
         (fun exists -> ValidateExistingSuccess(exists, item))
         Error
-    | ValidateExistingSuccess (exists, item) ->
+    | ValidateExistingSuccess(exists, item) ->
       match exists with
       | true -> state, Cmd.none
       | false ->
@@ -237,11 +237,11 @@ module ListItems =
       { state with
           ShowConfirmDeleteModal = show },
       Cmd.none
-    | ShowConfirmDeleteModalAction (item, result) ->
+    | ShowConfirmDeleteModalAction(item, result) ->
       let cmd =
         match result with
         | Ok result when result -> Cmd.ofMsg (DeleteItem item)
-        | _ -> Cmd.ofMsg (ShowConfirmDeleteModal None)
+        | _ -> Cmd.ofMsg (ShowConfirmDeleteModal ValueNone)
 
       state, cmd
     | DeleteItem item ->
@@ -260,12 +260,14 @@ module ListItems =
 
       { state with
           Items = items
-          ShowConfirmDeleteModal = None },
+          ShowConfirmDeleteModal = ValueNone },
       Cmd.none
 
     | ShareRequest items ->
       let stringified = stringifyItems items
-      let idValue = defaultArg state.TrackListId "Mandadin"
+
+      let idValue =
+        defaultValueArg state.TrackListId "Mandadin"
 
       state,
       Cmd.OfJS.either
@@ -291,121 +293,164 @@ module ListItems =
       state, Cmd.none
 
   let private newItemForm (state: State) (dispatch: Dispatch<Msg>) =
-    let currentContentTxt = "Nombre del objeto..."
+    let currentContentTxt =
+      "Nombre del objeto..."
 
-    form [ attr.``class`` "row flex-spaces background-muted border notes-form"
-           on.submit (fun _ -> CreateItem state.CurrentItem |> dispatch) ] [
-      fieldset [ attr.``class`` "form-group" ] [
-        label [ attr.``for`` "current-content" ] [
+    form {
+      attr.``class`` "row flex-spaces background-muted border notes-form"
+      on.submit (fun _ -> CreateItem state.CurrentItem |> dispatch)
+
+      fieldset {
+        attr.``class`` "form-group"
+
+        label {
+          attr.``for`` "current-content"
           text currentContentTxt
-        ]
-        textarea [ attr.id "current-content"
-                   attr.placeholder currentContentTxt
-                   bind.input.string
-                     state.CurrentItem
-                     (SetCurrentItem >> dispatch) ] []
-        label [ attr.``for`` "paperCheck1"
-                attr.``class`` "paper-check" ] [
-          input [ attr.id "paperCheck1"
-                  attr.name "paperChecks"
-                  attr.``type`` "checkbox"
-                  bind.``checked`` state.HideDone (HideDone >> dispatch) ]
-          span [] [
-            text "Esconder Terminados"
-          ]
-        ]
-      ]
-      button [ attr.``type`` "submit"
-               attr.``class`` "paper-btn btn-small"
-               attr.disabled (not state.CanAddCurrentItem) ] [
-        Icon.Get Save None
-      ]
-    ]
+        }
 
-  let private listItem (dispatch: Dispatch<Msg>) (item: TrackListItem) =
-    li [ attr.``class`` "listitem-item"
-         attr.key item.Id ] [
-      input [ attr.``type`` "checkbox"
-              attr.``class`` "listitem-item-checkbox"
-              attr.id item.Id
-              bind.``checked``
-                item.IsDone
-                (fun isDone ->
-                  UpdateItemProp(item, (IsDone isDone)) |> dispatch) ]
-      input [ bind.input.string
-                item.Name
-                (fun name ->
-                  ValidateExisting { item with Name = name }
-                  |> dispatch) ]
-      button [ attr.``class`` "paper-btn btn-small btn-danger-outline m-0"
-               on.click (fun _ -> ShowConfirmDeleteModal(Some item) |> dispatch) ] [
+        textarea {
+          attr.id "current-content"
+          attr.placeholder currentContentTxt
+          bind.input.string state.CurrentItem (SetCurrentItem >> dispatch)
+        }
+
+        label {
+          attr.``for`` "paperCheck1"
+          attr.``class`` "paper-check"
+
+          input {
+            attr.id "paperCheck1"
+            attr.name "paperChecks"
+            attr.``type`` "checkbox"
+            bind.``checked`` state.HideDone (HideDone >> dispatch)
+          }
+
+          span { text "Esconder Terminados" }
+        }
+      }
+
+      button {
+        attr.``type`` "submit"
+        attr.``class`` "paper-btn btn-small"
+        attr.disabled (not state.CanAddCurrentItem)
+        Icon.Get Save None
+      }
+    }
+
+
+  let inline private listItem (dispatch: Dispatch<Msg>) (item: TrackListItem) =
+    li {
+      attr.``class`` "listitem-item"
+      attr.key item.Id
+
+      input {
+        attr.``type`` "checkbox"
+        attr.``class`` "listitem-item-checkbox"
+        attr.id item.Id
+
+        bind.``checked`` item.IsDone (fun isDone ->
+          UpdateItemProp(item, (IsDone isDone)) |> dispatch)
+      }
+
+      input {
+        bind.input.string item.Name (fun name ->
+          ValidateExisting { item with Name = name }
+          |> dispatch)
+      }
+
+      button {
+        attr.``class`` "paper-btn btn-small btn-danger-outline m-0"
+        on.click (fun _ -> ShowConfirmDeleteModal(ValueSome item) |> dispatch)
         Icon.Get Trash None
-      ]
-    ]
+      }
+    }
 
   let toolbar (state: State) (dispatch: Dispatch<Msg>) =
-    let getId = defaultArg state.TrackListId ""
+    let getId =
+      defaultValueArg state.TrackListId ""
 
-    div [ attr.``class`` "border" ] [
-      section [ attr.``class`` "row flex-center" ] [
-        h4 [] [ text getId ]
-      ]
-      section [ attr.``class`` "row flex-center" ] [
-        button [ attr.``class`` "paper-btn btn-small"
-                 on.click (fun _ -> dispatch GoBack) ] [
+    div {
+      attr.``class`` "border"
+
+      section {
+        attr.``class`` "row flex-center"
+        h4 { text getId }
+      }
+
+      section {
+        attr.``class`` "row flex-center"
+
+        button {
+          attr.``class`` "paper-btn btn-small"
+          on.click (fun _ -> dispatch GoBack)
           Icon.Get Back None
-        ]
-        if state.CanShare then
-          button [ attr.``class`` "paper-btn btn-small"
-                   on.click (fun _ -> ShareRequest state.Items |> dispatch) ] [
-            Icon.Get Share None
-          ]
-        button [ attr.``class`` "paper-btn btn-small"
-                 on.click (fun _ -> ToClipboard state.Items |> dispatch) ] [
-          (Icon.Get Copy None)
-        ]
-      ]
-    ]
+        }
+
+        cond state.CanShare
+        <| function
+          | true ->
+            button {
+              attr.``class`` "paper-btn btn-small"
+              on.click (fun _ -> ShareRequest state.Items |> dispatch)
+              Icon.Get Share None
+            }
+          | false -> empty ()
+
+        button {
+          attr.``class`` "paper-btn btn-small"
+          on.click (fun _ -> ToClipboard state.Items |> dispatch)
+          Icon.Get Copy None
+        }
+      }
+    }
 
   let view (state: State) (dispatch: Dispatch<Msg>) =
     let deleteModal (item: TrackListItem) =
       let title = "Borrar Elemento"
-      let subtitle = "esta operacion es irreversible"
+
+      let subtitle =
+        "esta operacion es irreversible"
 
       let txt =
         sprintf """Proceder con el borrado de "%s"?""" item.Name
 
-      let showModal = state.ShowConfirmDeleteModal.IsSome
+      let showModal =
+        state.ShowConfirmDeleteModal.IsSome
 
-      Modals.DeleteResourceModal
-        (title, subtitle, txt)
-        showModal
-        (fun result ->
-          ShowConfirmDeleteModalAction(item, result)
-          |> dispatch)
+      Modals.DeleteResourceModal (title, subtitle, txt) showModal (fun result ->
+        ShowConfirmDeleteModalAction(item, result)
+        |> dispatch)
 
-    article [] [
+    article {
       toolbar state dispatch
       newItemForm state dispatch
-      if state.ShowConfirmDeleteModal.IsSome then
-        deleteModal state.ShowConfirmDeleteModal.Value
-      ul [ attr.``class`` "tracklist-list" ] [
-        comp<Virtualize<TrackListItem>>
-          [ "Items" => ResizeArray(state.Items)
-            attr.fragmentWith "ChildContent" (listItem dispatch) ]
-          []
-      ]
-    ]
+
+      cond state.ShowConfirmDeleteModal
+      <| function
+        | ValueSome value -> deleteModal value
+        | ValueNone -> empty ()
+
+      ul {
+        attr.``class`` "tracklist-list"
+
+        virtualize.comp {
+          virtualize.placeholder (fun _ -> div { text "Cargando..." })
+          let! item = virtualize.items state.Items
+          listItem dispatch item
+        }
+
+      }
+    }
 
 
   type Page() =
     inherit ProgramComponent<State, Msg>()
 
     [<Parameter>]
-    member val OnBackRequested: Option<unit -> unit> = None with get, set
+    member val OnBackRequested: (unit -> unit) = id with get, set
 
     [<Parameter>]
-    member val ListId: Option<string> = None with get, set
+    member val ListId: ValueOption<string> = ValueNone with get, set
 
     [<Parameter>]
     member val CanShare: bool = false with get, set

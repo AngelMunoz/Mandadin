@@ -53,11 +53,16 @@ module Main =
       CanShare = false
       HasOverlayControls = false
       Title = getGreeting () },
-    Cmd.batch [ Cmd.ofMsg GetTheme
-                Cmd.ofMsg CanShare
-                Cmd.ofMsg GetHasOverlay ]
+    Cmd.batch
+      [ Cmd.ofMsg GetTheme
+        Cmd.ofMsg CanShare
+        Cmd.ofMsg GetHasOverlay ]
 
-  let private update (msg: Msg) (state: State) (js: IJSRuntime) : State * Cmd<Msg> =
+  let private update
+    (msg: Msg)
+    (state: State)
+    (js: IJSRuntime)
+    : State * Cmd<Msg> =
     match msg with
     | SetView view ->
       { state with
@@ -77,19 +82,26 @@ module Main =
         [| jsThemeArg |]
         (fun didChange -> ChangeThemeSuccess(didChange, theme))
         Error
-    | ChangeThemeSuccess (didChange, theme) ->
+    | ChangeThemeSuccess(didChange, theme) ->
       if didChange then
         { state with Theme = theme }, Cmd.none
       else
         state, Cmd.ofMsg (Error(exn "Failed to change theme"))
     | GetHasOverlay ->
       state,
-      Cmd.OfJS.either js "Mandadin.Theme.HasOverlayControls" [||] GetHasOverlaySuccess Error
+      Cmd.OfJS.either
+        js
+        "Mandadin.Theme.HasOverlayControls"
+        [||]
+        GetHasOverlaySuccess
+        Error
     | GetHasOverlaySuccess hasOverlay ->
       { state with
           HasOverlayControls = hasOverlay },
       Cmd.none
-    | GetTheme -> state, Cmd.OfJS.either js "Mandadin.Theme.GetTheme" [||] GetThemeSuccess Error
+    | GetTheme ->
+      state,
+      Cmd.OfJS.either js "Mandadin.Theme.GetTheme" [||] GetThemeSuccess Error
     | GetThemeSuccess theme ->
       let theme =
         match theme with
@@ -103,59 +115,68 @@ module Main =
           Cmd.none
 
       { state with Theme = theme }, cmd
-    | CanShare -> state, Cmd.OfJS.either js "Mandadin.Share.CanShare" [||] CanShareSuccess Error
+    | CanShare ->
+      state,
+      Cmd.OfJS.either js "Mandadin.Share.CanShare" [||] CanShareSuccess Error
     | CanShareSuccess canShare -> { state with CanShare = canShare }, Cmd.none
     | Error err ->
       eprintfn "Update Error: [%s]" err.Message
       state, Cmd.none
 
-  let private router = Router.infer SetView (fun m -> m.View)
+  let private router =
+    Router.infer SetView (fun m -> m.View)
 
 
   let private navigateToList (dispatch: Dispatch<Msg>) (route: string) =
     View.ListDetail route |> SetView |> dispatch
 
-  let private goBack (dispatch: Dispatch<Msg>) () = SetView View.Lists |> dispatch
+  let private goBack (dispatch: Dispatch<Msg>) () =
+    SetView View.Lists |> dispatch
 
   let private view (state: State) (dispatch: Dispatch<Msg>) : Node =
     let getRoute (view: View) = router.HRef view
 
     let onThemeChangeRequest (theme: Theme) = TryChangeTheme theme |> dispatch
 
-    article [ attr.``class`` "mandadin" ] [
-      if state.HasOverlayControls then
-        TitleBar.View(Some state.Title)
-      Navbar.View state.Theme onThemeChangeRequest getRoute
-      main [ attr.``class`` "paper container mandadin-main" ] [
-        match state.View with
-        | View.Import ->
-          comp<Views.Import.Page>
-            [ "OnGoToListRequested"
-              => Some(navigateToList dispatch) ]
-            []
-        | View.Notes -> comp<Views.Notes.Page> [ "CanShare" => state.CanShare ] []
-        | View.Lists ->
-          comp<Views.Lists.Page>
-            [ "OnRouteRequested"
-              => Some(navigateToList dispatch) ]
-            []
-        | View.ListDetail listId ->
-          comp<Views.ListItems.Page>
-            [ "ListId" => Some listId
-              "CanShare" => state.CanShare
-              "OnBackRequested" => Some(goBack dispatch) ]
-            []
-      ]
-      footer [ attr.``class`` "paper row flex-spaces mandadin-footer" ] [
-        p [] [
-          text "\u00A9 Tunaxor Apps 2020 - 2021"
-        ]
-        p [] [
-          text "Mandadin4"
-        ]
-      ]
-    ]
+    article {
+      attr.``class`` "mandadin"
 
+      cond state.HasOverlayControls
+      <| function
+        | true -> TitleBar.View(Some state.Title)
+        | false -> empty ()
+
+      Navbar.View state.Theme onThemeChangeRequest getRoute
+
+      main {
+        attr.``class`` "paper container mandadin-main"
+
+        cond state.View
+        <| function
+          | View.Import ->
+            comp<Views.Import.Page> {
+              "OnGoToListRequested" => navigateToList dispatch
+            }
+          | View.Notes ->
+            comp<Views.Notes.Page> { "CanShare" => state.CanShare }
+          | View.Lists ->
+            comp<Views.Lists.Page> {
+              "OnRouteRequested" => navigateToList dispatch
+            }
+          | View.ListDetail listId ->
+            comp<Views.ListItems.Page> {
+              "ListId" => ValueSome listId
+              "CanShare" => state.CanShare
+              "OnBackRequested" => goBack dispatch
+            }
+      }
+
+      footer {
+        attr.``class`` "paper row flex-spaces mandadin-footer"
+        p { text "\u00A9 Tunaxor Apps 2020 - 2024" }
+        p { text "Mandadin4" }
+      }
+    }
 
   type Mandadin() as this =
     inherit ProgramComponent<State, Msg>()
