@@ -5,12 +5,10 @@ open Microsoft.AspNetCore.Components
 
 [<RequireQualifiedAccess>]
 module Modals =
-  open Fable
   open Bolero
 
   module Import =
     open Elmish
-    open System
 
     [<Struct>]
     type ImportData = { title: string; content: string }
