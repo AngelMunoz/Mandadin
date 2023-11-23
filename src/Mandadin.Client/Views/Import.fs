@@ -1,41 +1,32 @@
 ﻿namespace Mandadin.Client.Views
 
-open Elmish
+open System
+open Microsoft.Extensions.Logging
+open Microsoft.AspNetCore.Components
 open Microsoft.JSInterop
+
+open Elmish
+
 open Bolero
 open Bolero.Html
 open Bolero.Remoting.Client
-open Mandadin.Client
-open Microsoft.AspNetCore.Components
 
+open Mandadin.Client
 
 [<RequireQualifiedAccess>]
 module Import =
-  open System
 
-  let parseContentString (content: string) : array<array<obj>> =
-    let parseRow (row: string) =
-      let split = row.Split("] ")
+  let inline parseContentString (content: string) =
+    content.Split(Environment.NewLine)
+    |> Parse.entries
 
-      let isDone =
-        match split |> Array.tryItem 0 with
-        | Some content -> content.Contains('x')
-        | None -> false
-
-      let nameStr =
-        match split |> Array.tryItem 1 with
-        | Some content -> content.Trim()
-        | None -> "Error de linea"
-
-      [| box isDone; box nameStr |]
-
-    content.Split('\n') |> Array.Parallel.map parseRow
-
+  [<Struct>]
   type ShareDataPayload =
     { Text: string
       Title: string
       Url: string }
 
+  [<Struct>]
   type State =
     { ShareData: ValueOption<ShareDataPayload> }
 
@@ -58,6 +49,7 @@ module Import =
     (state: State)
     (goToList: string -> unit)
     (js: IJSRuntime)
+    (logger: ILogger)
     =
     match msg with
     | RequestImportData ->
@@ -74,11 +66,20 @@ module Import =
     | ImportResult result ->
       match result with
       | Ok(title, content) ->
-        let items = parseContentString content
-        state, Cmd.ofMsg (CreateFromImport(title, items))
-      | Result.Error() ->
+        match parseContentString content with
+        | Ok items -> state, Cmd.ofMsg (CreateFromImport(title, items))
+        | Result.Error errs ->
+          errs
+          |> List.iter (fun (line, err) ->
+            logger.LogDebug(
+              "Failed at {index} with: {error} for '{line}'",
+              err.idx,
+              err.message,
+              line
+            ))
 
-        { state with ShareData = ValueNone }, Cmd.none
+          state, Cmd.none
+      | Result.Error() -> { state with ShareData = ValueNone }, Cmd.none
     | CreateFromImport(title, items) ->
       state,
       Cmd.OfJS.either
@@ -91,13 +92,10 @@ module Import =
       goToList trackList.Id
       state, Cmd.none
     | Error err ->
-      eprintfn "%O" err
+      logger.LogDebug("Error: {error}", err)
       { state with ShareData = ValueNone }, Cmd.none
 
   let view (state: State) (dispatch: Dispatch<Msg>) =
-    let data =
-      state.ShareData
-      |> ValueOption.defaultValue ({ Title = ""; Text = ""; Url = "" })
 
     article {
       a {
@@ -135,15 +133,21 @@ module Import =
     }
 
 
-  type Page() as this =
+  type Page() =
     inherit ProgramComponent<State, Msg>()
+
+    [<Inject>]
+    member val LoggerFactory = Unchecked.defaultof<ILoggerFactory> with get, set
 
     [<Parameter>]
     member val OnGoToListRequested: string -> unit = ignore with get, set
 
-    override _.Program =
+    override self.Program =
       let update msg state =
-        update msg state this.OnGoToListRequested this.JSRuntime
+        let logger =
+          self.LoggerFactory.CreateLogger("Import Page")
+
+        update msg state self.OnGoToListRequested self.JSRuntime logger
 
 
       Program.mkProgram init update view

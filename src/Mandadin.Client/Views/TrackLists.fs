@@ -1,12 +1,16 @@
 namespace Mandadin.Client.Views
 
-open Elmish
 open Microsoft.JSInterop
+open Microsoft.AspNetCore.Components
+open Microsoft.Extensions.Logging
+
+open Elmish
 open Bolero
 open Bolero.Html
 open Bolero.Remoting.Client
+
 open Mandadin.Client
-open Microsoft.AspNetCore.Components
+
 
 [<RequireQualifiedAccess>]
 module Lists =
@@ -61,6 +65,7 @@ module Lists =
     (msg: Msg)
     (state: State)
     (js: IJSRuntime)
+    (logger: ILogger)
     (onRouteRequested: string -> unit)
     =
     match msg with
@@ -130,10 +135,19 @@ module Lists =
       let cmd =
         match result with
         | Ok(title, content) ->
-          let parsed =
-            Import.parseContentString content
+          match Import.parseContentString content with
+          | Ok parsed -> Cmd.ofMsg (CreateFromImport(title, parsed))
+          | Result.Error errs ->
+            errs
+            |> List.iter (fun (line, err) ->
+              logger.LogDebug(
+                "Failed at {index} with: {error} for '{line}'",
+                err.idx,
+                err.message,
+                line
+              ))
 
-          Cmd.ofMsg (CreateFromImport(title, parsed))
+            Cmd.none
         | _ -> Cmd.ofMsg (ShowImportDialog false)
 
       { state with FromClipboard = ValueNone }, cmd
@@ -300,15 +314,21 @@ module Lists =
 
 
 
-  type Page() as this =
+  type Page() =
     inherit ProgramComponent<State, Msg>()
+
+    [<Inject>]
+    member val LoggerFactory = Unchecked.defaultof<ILoggerFactory> with get, set
 
     [<Parameter>]
     member val OnRouteRequested: (string -> unit) = ignore with get, set
 
-    override _.Program =
+    override self.Program =
       let update msg state =
-        update msg state this.JSRuntime this.OnRouteRequested
+        let logger =
+          self.LoggerFactory.CreateLogger("Lists Page")
+
+        update msg state self.JSRuntime logger self.OnRouteRequested
 
       Program.mkProgram init update view
 #if DEBUG
