@@ -1,7 +1,6 @@
 namespace Mandadin.Client
 
 open Bolero
-open Bolero.Html
 
 [<RequireQualifiedAccess>]
 type View =
@@ -10,22 +9,25 @@ type View =
   | [<EndPoint "lists/{listId}">] ListDetail of listId: string
   | [<EndPoint "/import">] Import
 
-[<RequireQualifiedAccess>]
+[<RequireQualifiedAccess; Struct>]
 type Theme =
   | Light
   | Dark
   | Custom
 
+[<Struct>]
 type SaveResult = { Id: string; Ok: bool; Rev: string }
 
+[<Struct>]
 type Note =
   { Id: string
     Content: string
     Rev: string }
 
-
+[<Struct>]
 type TrackList = { Id: string; Rev: string }
 
+[<Struct>]
 type TrackListItem =
   { Id: string
     IsDone: bool
@@ -33,6 +35,7 @@ type TrackListItem =
     Name: string
     Rev: string }
 
+[<Struct>]
 type Icon =
   | Copy
   | Share
@@ -58,17 +61,19 @@ module Icon =
   type Check = Template<"wwwroot/icons/check.html">
   type Back = Template<"wwwroot/icons/back.html">
 
-  let Get (icon: Icon) (color: Option<string>) : Node =
+type Icon with
+
+  static member Get(icon: Icon, ?color: string) =
     let color = defaultArg color "currentColor"
 
     match icon with
-    | Copy -> Copy().Fill(color).Elt()
-    | Share -> Share().Fill(color).Elt()
-    | Trash -> Trash().Fill(color).Elt()
-    | Clipboard -> Clipboard().Fill(color).Elt()
-    | Save -> Save().Fill(color).Elt()
-    | Text -> Text().Fill(color).Elt()
-    | Import -> Import().Fill(color).Elt()
-    | Close -> Close().Fill(color).Elt()
-    | Check -> Check().Fill(color).Elt()
-    | Back -> Back().Fill(color).Elt()
+    | Copy -> Icon.Copy().Fill(color).Elt()
+    | Share -> Icon.Share().Fill(color).Elt()
+    | Trash -> Icon.Trash().Fill(color).Elt()
+    | Clipboard -> Icon.Clipboard().Fill(color).Elt()
+    | Save -> Icon.Save().Fill(color).Elt()
+    | Text -> Icon.Text().Fill(color).Elt()
+    | Import -> Icon.Import().Fill(color).Elt()
+    | Close -> Icon.Close().Fill(color).Elt()
+    | Check -> Icon.Check().Fill(color).Elt()
+    | Back -> Icon.Back().Fill(color).Elt()

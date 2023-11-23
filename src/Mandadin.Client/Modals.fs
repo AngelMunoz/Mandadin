@@ -54,7 +54,7 @@ module Modals =
               label {
                 attr.``class`` "btn-close"
                 on.click (fun _ -> dispatch Dismiss)
-                Icon.Get Close None
+                Icon.Get Close
               }
 
               h4 {
@@ -90,14 +90,14 @@ module Modals =
 
                 on.click (fun _ -> dispatch Import)
 
-                Icon.Get Check None
+                Icon.Get Check
                 text "Importar contenido"
               }
 
               button {
                 attr.``class`` "paper-btn btn-danger-outline"
                 on.click (fun _ -> dispatch Dismiss)
-                Icon.Get Trash None
+                Icon.Get Trash
                 text "Cancelar"
               }
             }
@@ -146,7 +146,7 @@ module Modals =
           label {
             attr.``class`` "btn-close"
             on.click (fun _ -> Error() |> action)
-            Icon.Get Close None
+            Icon.Get Close
           }
 
           h4 {
@@ -167,14 +167,14 @@ module Modals =
           button {
             attr.``class`` "paper-btn btn-danger-outline"
             on.click (fun _ -> Ok true |> action)
-            Icon.Get Check None
+            Icon.Get Check
             text "Si, Continuar"
           }
 
           button {
             attr.``class`` "paper-btn btn-success-outline"
             on.click (fun _ -> Ok false |> action)
-            Icon.Get Trash None
+            Icon.Get Trash
             text "Cancelar"
           }
         }

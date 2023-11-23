@@ -102,17 +102,17 @@ module Import =
     article {
       a {
         attr.href "/"
-        Icon.Get Back None
+        Icon.Get Back
       }
 
-      cond state.ShareData.IsNone
+      cond state.ShareData
       <| function
-        | true ->
+        | ValueNone ->
           p {
             text
               "No pudimos obtener informacion de lo que nos querias compartir 😢"
           }
-        | false -> empty ()
+        | _ -> empty ()
 
       cond state.ShareData
       <| function

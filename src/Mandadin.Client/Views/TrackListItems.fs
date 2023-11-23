@@ -333,7 +333,7 @@ module ListItems =
         attr.``type`` "submit"
         attr.``class`` "paper-btn btn-small"
         attr.disabled (not state.CanAddCurrentItem)
-        Icon.Get Save None
+        Icon.Get Save
       }
     }
 
@@ -361,7 +361,7 @@ module ListItems =
       button {
         attr.``class`` "paper-btn btn-small btn-danger-outline m-0"
         on.click (fun _ -> ShowConfirmDeleteModal(ValueSome item) |> dispatch)
-        Icon.Get Trash None
+        Icon.Get Trash
       }
     }
 
@@ -383,7 +383,7 @@ module ListItems =
         button {
           attr.``class`` "paper-btn btn-small"
           on.click (fun _ -> dispatch GoBack)
-          Icon.Get Back None
+          Icon.Get Back
         }
 
         cond state.CanShare
@@ -392,14 +392,14 @@ module ListItems =
             button {
               attr.``class`` "paper-btn btn-small"
               on.click (fun _ -> ShareRequest state.Items |> dispatch)
-              Icon.Get Share None
+              Icon.Get Share
             }
           | false -> empty ()
 
         button {
           attr.``class`` "paper-btn btn-small"
           on.click (fun _ -> ToClipboard state.Items |> dispatch)
-          Icon.Get Copy None
+          Icon.Get Copy
         }
       }
     }

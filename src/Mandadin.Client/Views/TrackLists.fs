@@ -206,14 +206,14 @@ module Lists =
       button {
         attr.``type`` "submit"
         attr.disabled (not state.CanAddCurrentName)
-        Icon.Get Save None
+        Icon.Get Save
       }
 
       button {
         attr.``class`` "paper-btn btn-small"
         attr.``type`` "button"
         on.click (fun _ -> FromClipboard |> dispatch)
-        Icon.Get Import None
+        Icon.Get Import
       }
 
     }
@@ -232,13 +232,13 @@ module Lists =
       button {
         attr.``class`` "paper-btn btn-small btn-primary-outline"
         on.click (fun _ -> RequestRoute item.Id |> dispatch)
-        Icon.Get Text None
+        Icon.Get Text
       }
 
       button {
         attr.``class`` "paper-btn btn-small btn-danger-outline"
         on.click (fun _ -> ShowConfirmDeleteModal(ValueSome item) |> dispatch)
-        Icon.Get Trash None
+        Icon.Get Trash
       }
     }
 
