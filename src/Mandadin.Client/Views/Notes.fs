@@ -185,7 +185,7 @@ module Notes =
       button {
         attr.``type`` "button"
         on.click (fun _ -> FromClipboard |> dispatch)
-        Icon.Get Clipboard None
+        Icon.Get Clipboard
       }
     }
 
@@ -203,7 +203,7 @@ module Notes =
           button {
             attr.``class`` "paper-btn btn-small btn-muted-outline"
             on.click (fun _ -> ToClipboard item |> dispatch)
-            Icon.Get Copy None
+            Icon.Get Copy
           }
 
           cond canShare
@@ -213,13 +213,13 @@ module Notes =
               button {
                 attr.``class`` "paper-btn btn-small btn-muted-outline"
                 on.click (fun _ -> ShareContent item |> dispatch)
-                Icon.Get Share None
+                Icon.Get Share
               }
 
           button {
             attr.``class`` "paper-btn btn-small btn-danger-outline"
             on.click (fun _ -> DeleteNote(item.Id, item.Rev) |> dispatch)
-            Icon.Get Trash None
+            Icon.Get Trash
           }
         }
       }

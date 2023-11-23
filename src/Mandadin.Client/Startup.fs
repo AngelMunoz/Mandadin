@@ -1,19 +1,36 @@
 namespace Mandadin.Client
 
+open Microsoft.Extensions.Logging
 open Microsoft.AspNetCore.Components.WebAssembly.Hosting
 
 module Program =
 
   [<EntryPoint>]
   let Main args =
-    let builder =
-      WebAssemblyHostBuilder.CreateDefault(args)
+    task {
+      let builder =
+        WebAssemblyHostBuilder.CreateDefault(args)
 
-    builder.RootComponents.Add<Main.Mandadin>("#main")
+      builder.RootComponents.Add<Main.Mandadin>("#main")
 
-    builder.Build().RunAsync()
-    |> Async.AwaitTask
-    |> Async.Start
+      let level =
+        if builder.HostEnvironment.Environment = "Production" then
+          LogLevel.Information
+        else
+          LogLevel.Debug
+
+      builder.Logging.AddFilter(
+        "Microsoft.AspNetCore.Components.RenderTree.*",
+        LogLevel.Warning
+      )
+      |> ignore
+
+      builder.Logging.SetMinimumLevel(level) |> ignore
+
+      let app = builder.Build()
+
+      do! app.RunAsync()
+    }
     |> ignore
 
     0

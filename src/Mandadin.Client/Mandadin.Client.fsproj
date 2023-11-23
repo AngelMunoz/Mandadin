@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -8,6 +8,8 @@
   <ItemGroup>
     <Compile Include="Types.fs" />
     <Compile Include="Components/Navbar.fs" />
+    <Compile Include="Parser.fsi" />
+    <Compile Include="Parser.fs" />
     <Compile Include="Modals.fs" />
     <Compile Include="Views/Import.fs" />
     <Compile Include="Views/Notes.fs" />
@@ -20,6 +22,9 @@
     <PackageReference Include="Bolero" Version="0.*" />
     <PackageReference Include="Bolero.Build" Version="0.*" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="8.0.*" />
+    
+    <PackageReference Include="FsToolkit.ErrorHandling" Version="4.11.0" />
+    <PackageReference Include="TheBlunt" Version="1.0.1" />
   </ItemGroup>
   <!-- <ItemGroup>
     <Content Remove="wwwroot\**" />

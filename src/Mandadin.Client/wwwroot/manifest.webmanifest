@@ -59,7 +59,7 @@
   ],
   "protocol_handlers": [
     {
-      "protocol": "mandadin-web",
+      "protocol": "web+mandadin",
       "url": "/lists/%s"
     }
   ],
