@@ -256,23 +256,25 @@ module Lists =
       }
     }
 
+  let deleteModal state dispatch =
+
+    cond state.ShowConfirmDeleteModal
+    <| function
+      | ValueSome item ->
+        let title = "Borrar Elemento"
+
+        let subtitle =
+          "esta operacion es irreversible"
+
+        let txt =
+          $"""Proceder con el borrado de "%s{item.Id}"?"""
+
+        Modals.DeleteResourceModal (title, subtitle, txt) (fun result ->
+          ShowConfirmDeleteModalAction(item, result)
+          |> dispatch)
+      | ValueNone -> empty ()
+
   let view (state: State) (dispatch: Dispatch<Msg>) =
-    let deleteModal (item: TrackList) =
-      let title = "Borrar Elemento"
-
-      let subtitle =
-        "esta operacion es irreversible"
-
-      let txt =
-        sprintf """Proceder con el borrado de "%s"?""" item.Id
-
-      let showModal =
-        state.ShowConfirmDeleteModal.IsSome
-
-
-      Modals.DeleteResourceModal (title, subtitle, txt) showModal (fun result ->
-        ShowConfirmDeleteModalAction(item, result)
-        |> dispatch)
 
     article {
       cond state.ShowImportDialog
@@ -299,10 +301,7 @@ module Lists =
 
       newListForm state dispatch
 
-      cond state.ShowConfirmDeleteModal
-      <| function
-        | ValueSome item -> deleteModal item
-        | ValueNone -> empty ()
+      deleteModal state dispatch
 
       ul {
         attr.``class`` "tracklist-list child-borders"
