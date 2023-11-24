@@ -3,7 +3,7 @@ namespace Mandadin.Client
 open Bolero
 
 [<RequireQualifiedAccess>]
-type View =
+type Page =
   | [<EndPoint "/">] Lists
   | [<EndPoint "/notes">] Notes
   | [<EndPoint "lists/{listId}">] ListDetail of listId: string
@@ -13,7 +13,22 @@ type View =
 type Theme =
   | Light
   | Dark
-  | Custom
+
+  static member ofString(theme: string) =
+    match theme with
+    | "Light" -> Light
+    | _ -> Dark
+
+  member this.AsString =
+    match this with
+    | Light -> "Light"
+    | Dark -> "Dark"
+
+  member this.AsDisplay =
+    match this with
+    | Light -> "Claro"
+    | Dark -> "Oscuro"
+
 
 [<Struct>]
 type SaveResult = { Id: string; Ok: bool; Rev: string }

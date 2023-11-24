@@ -11,7 +11,7 @@ module Program =
       let builder =
         WebAssemblyHostBuilder.CreateDefault(args)
 
-      builder.RootComponents.Add<Main.Mandadin>("#main")
+      builder.RootComponents.Add<AppShell>("#main")
 
       let level =
         if builder.HostEnvironment.Environment = "Production" then
@@ -21,7 +21,7 @@ module Program =
 
       builder.Logging.AddFilter(
         "Microsoft.AspNetCore.Components.RenderTree.*",
-        LogLevel.Warning
+        LogLevel.Trace
       )
       |> ignore
 
@@ -31,6 +31,7 @@ module Program =
 
       do! app.RunAsync()
     }
-    |> ignore
+    |> Async.AwaitTask
+    |> Async.Start
 
     0

@@ -1,33 +1,60 @@
 namespace Mandadin.Client
 
-open Elmish
-open Bolero
-open Bolero.Html
-open Microsoft.JSInterop
-open Bolero.Remoting.Client
-open Mandadin.Client.Components
 open System
 
-module Main =
+open Microsoft.Extensions.Logging
+open Microsoft.AspNetCore.Components
+open Microsoft.AspNetCore.Components.Routing
+open Microsoft.JSInterop
 
-  type State =
-    { View: View
-      Theme: Theme
-      CanShare: bool
-      HasOverlayControls: bool
-      Title: string }
+open IcedTasks
 
-  type Msg =
-    | SetView of View
-    | TryChangeTheme of Theme
-    | ChangeThemeSuccess of bool * Theme
-    | GetHasOverlay
-    | GetHasOverlaySuccess of bool
-    | GetTheme
-    | GetThemeSuccess of string
-    | CanShare
-    | CanShareSuccess of bool
-    | Error of exn
+open Elmish
+
+open Bolero
+open Bolero.Html
+open Bolero.Remoting.Client
+
+open Mandadin.Client.Components
+open Mandadin.Client.Components.Navbar
+open Mandadin.Client.Router
+
+[<Struct>]
+type AppInit =
+  { CanShare: bool
+    Theme: Theme
+    HasOverlay: bool
+    Title: string }
+
+[<Struct; NoComparison; NoEquality>]
+type AppDependencies =
+  { jsRuntime: IJSRuntime
+    logger: ILogger }
+
+[<Struct>]
+type ActionError =
+  | ThemeChangeFailed of targetTheme: Theme
+  | TitleChangeFailed of targetTitle: string
+  | SetViewFailed of targetPage: Page
+  | InitializationFailed of initError: string
+
+type Model =
+  { Page: Page
+    Theme: Theme
+    Title: string
+    CanShare: bool
+    HasOverlayControls: bool }
+
+[<Struct>]
+type Message =
+  | SetView of view: Page
+  | SetTheme of theme: Theme
+  | SetTitle of title: string
+  | SetInitial of init: AppInit
+  | NotifyFailure of failure: ActionError
+
+[<AutoOpen>]
+module Mandadin =
 
   let (|Morning|Evening|Night|Unknown|) =
     function
@@ -36,7 +63,7 @@ module Main =
     | num when num > 19 || num < 5 -> Night
     | num -> Unknown num
 
-  let getGreeting () =
+  let inline getGreeting () =
     let hour = DateTime.Now.Hour
 
     match hour with
@@ -47,97 +74,176 @@ module Main =
       printfn $"{num}"
       "Hola!"
 
-  let private init (_: 'arg) : State * Cmd<Msg> =
-    { View = View.Notes
+  let inline navigateToList dispatch (route: string) =
+    Page.ListDetail route |> SetView |> dispatch
+
+  let inline goBack dispatch () = SetView Page.Lists |> dispatch
+
+  let onThemeChangeRequest
+    { jsRuntime = jsRuntime
+      logger = logger }
+    (state: Model)
+    dispatch
+    _
+    =
+    valueTaskUnit {
+      let newTheme =
+        match state.Theme with
+        | Theme.Dark -> Theme.Light
+        | Theme.Light -> Theme.Dark
+
+      try
+        logger.LogDebug("Requesting New Theme: {value}", newTheme.AsDisplay)
+
+        let! value =
+          jsRuntime.InvokeAsync<bool>(
+            "Mandadin.Theme.SwitchTheme",
+            [| box newTheme.AsString |]
+          )
+
+        logger.LogDebug("Accepted Theme: {value}", value)
+
+        if value then
+          SetTheme newTheme |> dispatch
+        else
+          NotifyFailure(ThemeChangeFailed newTheme)
+          |> dispatch
+      with ex ->
+        logger.LogWarning("Failed to get theme: {error}", ex.Message)
+
+        NotifyFailure(ThemeChangeFailed newTheme)
+        |> dispatch
+
+      return ()
+    }
+    |> ignore
+
+  let tryGetHasOverlay
+    { jsRuntime = jsRuntime
+      logger = logger }
+    =
+    cancellableValueTask {
+      let! token = CancellableValueTask.getCancellationToken ()
+
+      try
+        let! value =
+          jsRuntime.InvokeAsync<bool>(
+            "Mandadin.Theme.HasOverlayControls",
+            token,
+            [||]
+          )
+
+        logger.LogDebug("Overlay status: {value}", value)
+        return false
+      with ex ->
+        logger.LogWarning("Failed to get overlay status: {error}", ex.Message)
+
+        return false
+    }
+
+  let tryGetTheme
+    { jsRuntime = jsRuntime
+      logger = logger }
+    =
+    cancellableValueTask {
+      let! token = CancellableValueTask.getCancellationToken ()
+
+      try
+        let! value =
+          jsRuntime.InvokeAsync<string>("Mandadin.Theme.GetTheme", token, [||])
+
+        logger.LogDebug("Theme: {value}", value)
+        return value |> Theme.ofString
+      with ex ->
+        logger.LogWarning("Failed to get theme: {error}", ex.Message)
+
+        return Theme.Dark
+    }
+
+  let tryGetCanShare
+    { jsRuntime = jsRuntime
+      logger = logger }
+    =
+    cancellableValueTask {
+      let! token = CancellableValueTask.getCancellationToken ()
+
+      try
+        let! value =
+          jsRuntime.InvokeAsync<bool>("Mandadin.Share.CanShare", token, [||])
+
+        logger.LogDebug("Share status: {value}", value)
+        return value
+      with ex ->
+        logger.LogWarning("Failed to get share status: {error}", ex.Message)
+
+        return false
+    }
+
+  let setInitialParams dependencies =
+    cancellableTask {
+      let! hasOverlay = tryGetHasOverlay dependencies
+
+      let! theme = tryGetTheme dependencies
+
+      let! canShare = tryGetCanShare dependencies
+
+      return
+        { CanShare = canShare
+          Theme = theme
+          HasOverlay = hasOverlay
+          Title = getGreeting () }
+    }
+
+type AppShell() =
+  inherit ProgramComponent<Model, Message>()
+
+  let cancellationTokenSource =
+    new Threading.CancellationTokenSource()
+
+  let init dependencies cancellationToken =
+    { Page = Page.Notes
       Theme = Theme.Dark
       CanShare = false
       HasOverlayControls = false
       Title = getGreeting () },
-    Cmd.batch
-      [ Cmd.ofMsg GetTheme
-        Cmd.ofMsg CanShare
-        Cmd.ofMsg GetHasOverlay ]
+    Cmd.OfTask.either
+      (setInitialParams dependencies)
+      cancellationToken
+      SetInitial
+      (fun err -> NotifyFailure(InitializationFailed err.Message))
 
-  let private update
-    (msg: Msg)
-    (state: State)
-    (js: IJSRuntime)
-    : State * Cmd<Msg> =
-    match msg with
-    | SetView view ->
-      { state with
-          View = view
-          Title = getGreeting () },
-      Cmd.none
-    | TryChangeTheme theme ->
-      let jsThemeArg =
-        match theme with
-        | Theme.Dark -> "Dark"
-        | _ -> "Light"
 
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Theme.SwitchTheme"
-        [| jsThemeArg |]
-        (fun didChange -> ChangeThemeSuccess(didChange, theme))
-        Error
-    | ChangeThemeSuccess(didChange, theme) ->
-      if didChange then
-        { state with Theme = theme }, Cmd.none
-      else
-        state, Cmd.ofMsg (Error(exn "Failed to change theme"))
-    | GetHasOverlay ->
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Theme.HasOverlayControls"
-        [||]
-        GetHasOverlaySuccess
-        Error
-    | GetHasOverlaySuccess hasOverlay ->
-      { state with
+  let update { jsRuntime = _; logger = logger } message model =
+    match message with
+    | SetView view -> { model with Page = view }, Cmd.none
+    | SetTheme theme -> { model with Theme = theme }, Cmd.none
+    | SetTitle title -> { model with Title = title }, Cmd.none
+    | SetInitial { CanShare = canShare
+                   Theme = theme
+                   HasOverlay = hasOverlay
+                   Title = title } ->
+      { model with
+          CanShare = canShare
           HasOverlayControls = hasOverlay },
-      Cmd.none
-    | GetTheme ->
-      state,
-      Cmd.OfJS.either js "Mandadin.Theme.GetTheme" [||] GetThemeSuccess Error
-    | GetThemeSuccess theme ->
-      let theme =
-        match theme with
-        | "Light" -> Theme.Light
-        | _ -> Theme.Dark
+      Cmd.batch
+        [ Cmd.ofMsg (SetTheme theme)
+          Cmd.ofMsg (SetTitle title) ]
+    | NotifyFailure err ->
+      match err with
+      | ThemeChangeFailed targetTheme ->
+        logger.LogDebug("Theme Change Error: {error}", targetTheme)
+        model, Cmd.none
+      | TitleChangeFailed targetTitle ->
+        logger.LogDebug("Title Change Error: {error}", targetTitle)
+        model, Cmd.none
+      | SetViewFailed targetPage ->
+        logger.LogDebug("Set View Error: {error}", targetPage)
+        model, Cmd.none
+      | InitializationFailed err ->
+        logger.LogDebug("Initialization Error: {error}", err)
+        model, Cmd.none
 
-      let cmd =
-        if theme <> state.Theme then
-          Cmd.ofMsg (TryChangeTheme theme)
-        else
-          Cmd.none
-
-      { state with Theme = theme }, cmd
-    | CanShare ->
-      state,
-      Cmd.OfJS.either js "Mandadin.Share.CanShare" [||] CanShareSuccess Error
-    | CanShareSuccess canShare -> { state with CanShare = canShare }, Cmd.none
-    | Error err ->
-      eprintfn "Update Error: [%s]" err.Message
-      state, Cmd.none
-
-  let private router =
-    Router.infer SetView (fun m -> m.View)
-
-
-  let private navigateToList (dispatch: Dispatch<Msg>) (route: string) =
-    View.ListDetail route |> SetView |> dispatch
-
-  let private goBack (dispatch: Dispatch<Msg>) () =
-    SetView View.Lists |> dispatch
-
-  let private view (state: State) (dispatch: Dispatch<Msg>) : Node =
-    let getRoute (view: View) = router.HRef view
-
-    let onThemeChangeRequest (theme: Theme) = TryChangeTheme theme |> dispatch
-
+  let view dependencies state dispatch =
     article {
       attr.``class`` "mandadin"
 
@@ -146,24 +252,36 @@ module Main =
         | true -> TitleBar.View(Some state.Title)
         | false -> empty ()
 
-      Navbar.View state.Theme onThemeChangeRequest getRoute
+      Navbar.View(
+        state.Theme,
+        onThemeChangeRequest dependencies state dispatch,
+        concat {
+          Router.navLink<AppShell, _, _> (Page.Notes, "Notas")
+
+          Router.navLink<AppShell, _, _> (
+            Page.Lists,
+            "Listas",
+            linkMatch = NavLinkMatch.Prefix
+          )
+        }
+      )
 
       main {
         attr.``class`` "paper container mandadin-main"
 
-        cond state.View
+        cond state.Page
         <| function
-          | View.Import ->
+          | Page.Import ->
             comp<Views.Import.Page> {
               "OnGoToListRequested" => navigateToList dispatch
             }
-          | View.Notes ->
+          | Page.Notes ->
             comp<Views.Notes.Page> { "CanShare" => state.CanShare }
-          | View.Lists ->
+          | Page.Lists ->
             comp<Views.Lists.Page> {
               "OnRouteRequested" => navigateToList dispatch
             }
-          | View.ListDetail listId ->
+          | Page.ListDetail listId ->
             comp<Views.ListItems.Page> {
               "ListId" => ValueSome listId
               "CanShare" => state.CanShare
@@ -178,14 +296,33 @@ module Main =
       }
     }
 
-  type Mandadin() as this =
-    inherit ProgramComponent<State, Msg>()
+  static member val Router = Router.infer SetView (fun m -> m.Page)
 
-    override _.Program =
-      let update msg state = update msg state this.JSRuntime
+  [<Inject>]
+  member val LoggerFactory: ILoggerFactory =
+    Unchecked.defaultof<ILoggerFactory> with get, set
 
-      Program.mkProgram init update view
-      |> Program.withRouter router
+  override this.Program =
+    let dependencies =
+      { jsRuntime = this.JSRuntime
+        logger = this.LoggerFactory.CreateLogger("AppShell") }
+
+    let view = view dependencies
+    let update = update dependencies
+
+    let init _ =
+      init dependencies cancellationTokenSource.Token
+
+    Program.mkProgram init update view
+    |> Program.withRouter AppShell.Router
 #if DEBUG
-      |> Program.withConsoleTrace
+    |> Program.withConsoleTrace
 #endif
+
+
+  interface IDisposable with
+    member _.Dispose() =
+      if not cancellationTokenSource.IsCancellationRequested then
+        cancellationTokenSource.Cancel()
+
+      cancellationTokenSource.Dispose()
