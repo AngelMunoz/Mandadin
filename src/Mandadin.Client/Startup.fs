@@ -1,7 +1,9 @@
 namespace Mandadin.Client
 
+open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open Microsoft.AspNetCore.Components.WebAssembly.Hosting
+
 
 module Program =
 
@@ -21,11 +23,16 @@ module Program =
 
       builder.Logging.AddFilter(
         "Microsoft.AspNetCore.Components.RenderTree.*",
-        LogLevel.Trace
+        LogLevel.Warning
       )
       |> ignore
 
       builder.Logging.SetMinimumLevel(level) |> ignore
+
+      builder.Services
+        .AddSingleton<ITrackListItemService>(Services.ListItems.factory)
+        .AddSingleton<IShareService>(Services.Share.factory)
+      |> ignore
 
       let app = builder.Build()
 
