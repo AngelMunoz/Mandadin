@@ -123,7 +123,6 @@ module Modals =
 
   let DeleteResourceModal
     (content: string * string * string)
-    (isOpen: bool)
     (action: Result<bool, unit> -> unit)
     =
     let (title, subtitle, message) = content
@@ -133,7 +132,7 @@ module Modals =
         attr.``class`` "modal-state"
         attr.id "modal-1"
         attr.``type`` "checkbox"
-        attr.``checked`` isOpen
+        attr.``checked`` true
       }
 
       div {
