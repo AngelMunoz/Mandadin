@@ -6,81 +6,60 @@ open Mandadin.Client
 open Microsoft.AspNetCore.Components.Routing
 
 module Navbar =
+  let collapsibleMenu =
+    concat {
+      input {
+        attr.``class`` "toggle"
+        attr.id "collapsible1"
+        attr.name "collapsible1"
+        attr.``type`` "checkbox"
+      }
 
-  let View
-    (theme: Theme)
-    (onThemeChangeRequest: Theme -> unit)
-    (getHref: View -> Attr)
-    =
-    let collapsible =
-      [ input {
-          attr.``class`` "toggle"
-          attr.id "collapsible1"
-          attr.name "collapsible1"
-          attr.``type`` "checkbox"
-        }
+      label {
+        attr.``for`` "collapsible1"
 
-        label {
-          attr.``for`` "collapsible1"
-
-          for i in 1..3 do
-            div { attr.``class`` (sprintf "bar%i" i) }
-        } ]
-
-    let listLinks =
-      let getThemeText =
-        textf
-          "Tema %s"
-          (if theme = Theme.Dark then
-             "Claro"
-           else
-             "Oscuro")
-
-      let onThemeItemClick _ =
-        match theme with
-        | Theme.Light -> onThemeChangeRequest Theme.Dark
-        | _ -> onThemeChangeRequest Theme.Light
-
-      [ li {
-          navLink NavLinkMatch.All {
-            getHref View.Notes
-            text "Notas"
-          }
-        }
-        li {
-          navLink NavLinkMatch.All {
-            getHref View.Lists
-            text "Listas"
-          }
-        }
-        li {
-          attr.``class`` "cursor pointer"
-          on.click onThemeItemClick
-          getThemeText
-        } ]
-
-    nav {
-      attr.``class`` "split-nav mandadin-navbar"
-
-      section {
-        attr.``class`` "collapsible"
-
-        for el in collapsible do
-          el
-
-        div {
-          attr.``class`` "collapsible-body"
-
-          ul {
-            attr.``class`` "inline"
-
-            for el in listLinks do
-              el
-          }
-        }
+        for i in 1..3 do
+          div { attr.``class`` $"bar%i{i}" }
       }
     }
 
+  type Navbar =
+    static member View
+      (
+        theme: Theme,
+        ?onThemeChangeRequest: _ -> unit,
+        ?menuItems: Node
+      ) =
+      let onThemeChangeRequest =
+        defaultArg onThemeChangeRequest ignore
+
+      let menuItems =
+        defaultArg menuItems (empty ())
+
+      nav {
+        attr.``class`` "split-nav mandadin-navbar"
+
+        section {
+          attr.``class`` "collapsible"
+
+          collapsibleMenu
+
+          div {
+            attr.``class`` "collapsible-body"
+
+            ul {
+              attr.``class`` "inline"
+              menuItems
+
+              li {
+                attr.``class`` "cursor pointer"
+                on.click onThemeChangeRequest
+                textf "Tema %s" theme.AsDisplay
+              }
+            }
+          }
+        }
+      }
 
 module TitleBar =
   let View (title: string option) =
@@ -92,6 +71,6 @@ module TitleBar =
       navLink NavLinkMatch.All {
         attr.href "/"
         attr.``class`` "no-drag"
-        textf $"{title} | Mandadin"
+        text $"{title} | Mandadin"
       }
     }
