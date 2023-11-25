@@ -28,7 +28,7 @@
     <PackageReference Include="TheBlunt" Version="1.0.1" />
     <PackageReference Include="IcedTasks" Version="0.10.0" />
     <PackageReference Include="FsToolkit.ErrorHandling" Version="4.11.1" />
-    <PackageReference Include="FsToolkit.ErrorHandling.IcedTasks" Version="4.11.1" />
+    <PackageReference Include="FsToolkit.ErrorHandling.TaskResult" Version="4.11.1" />
   </ItemGroup>
   <!-- <ItemGroup>
     <Content Remove="wwwroot\**" />
