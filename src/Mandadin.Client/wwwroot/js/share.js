@@ -1,62 +1,64 @@
 const channel = new BroadcastChannel("share-target");
 
-
 /**
  * @returns {Promise<boolean>}
  */
 export function CanShare() {
+  //@ts-ignore
+  if (navigator.canShare) {
     //@ts-ignore
-    if (navigator.canShare) {
-        //@ts-ignore
-        return window.navigator.canShare({
-            title: '',
-            text: '',
-            url: ''
-        });
-    }
-    return Promise.resolve(false);
+    return window.navigator.canShare({
+      title: "",
+      text: "",
+      url: "",
+    });
+  }
+  return Promise.resolve(false);
 }
 
 /**
- * 
- * @param {string} title 
- * @param {string} text 
- * @param {string?} url 
+ *
+ * @param {string} title
+ * @param {string} text
+ * @param {string?} url
  * @returns {Promise<void>}
  */
 export function ShareContent(title, text, url = undefined) {
-    if (navigator.share) {
-        return navigator.share({ title, text, url });
-    }
-    return Promise.reject('Share API not available');
+  if (navigator.share) {
+    return navigator.share({ title, text, url: url ?? location.href });
+  }
+  return Promise.reject("Share API not available");
 }
 
-channel.onmessage = function(event) {
-    const isAllowed =
-        ["SEND_IMPORT_DATA"].includes(event.data.type);
+channel.onmessage = function (event) {
+  const isAllowed = ["SEND_IMPORT_DATA"].includes(event.data.type);
 
-    if (event.data && !isAllowed || (!event.data && !event.data.data)) {
-        return;
-    }
-    const data = event.data.data;
-    if (data && data.text) {
-        sessionStorage.setItem("import", JSON.stringify({
-            title: data.title,
-            text: data.text,
-            url: ""
-        }));
-    }
-}
+  if ((event.data && !isAllowed) || (!event.data && !event.data.data)) {
+    return;
+  }
+  const data = event.data.data;
+  if (data && data.text) {
+    sessionStorage.setItem(
+      "import",
+      JSON.stringify({
+        title: data.title,
+        text: data.text,
+        url: "",
+      })
+    );
+  }
+};
 
-const delay = time => new Promise(resolve => setTimeout(() => resolve(), time))
+const delay = (time) =>
+  new Promise((resolve) => setTimeout(() => resolve(), time));
 
 export async function ImportShareData() {
-    channel.postMessage({ type: "GET_IMPORT_DATA" })
-    await delay(500);
-    try {
-        return JSON.parse(sessionStorage.getItem("import"));
-    } catch (e) {
-        console.error(e);
-        return { text: '', title: '', url: '' }
-    }
+  channel.postMessage({ type: "GET_IMPORT_DATA" });
+  await delay(500);
+  try {
+    return JSON.parse(sessionStorage.getItem("import"));
+  } catch (e) {
+    console.error(e);
+    return { text: "", title: "", url: "" };
+  }
 }

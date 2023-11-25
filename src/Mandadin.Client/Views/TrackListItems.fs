@@ -1,344 +1,186 @@
-namespace Mandadin.Client.Views
+namespace Mandadin.Client.Views.ListItems
+
+
+open Microsoft.AspNetCore.Components
+open Microsoft.Extensions.Logging
+open Microsoft.Extensions.DependencyInjection
+
+open IcedTasks
+open FsToolkit.ErrorHandling
 
 open Elmish
-open Microsoft.JSInterop
 open Bolero
 open Bolero.Html
 open Bolero.Remoting.Client
+
 open Mandadin.Client
-open Microsoft.AspNetCore.Components
+open Mandadin.Client.Components.TrackListItems
+
+
+[<Struct>]
+type UpdatableItemProp =
+  | IsDone of isDone: bool
+  | Name of name: string
+
+  member this.AsString =
+    match this with
+    | IsDone isDone -> $"IsDone(%b{isDone})"
+    | Name name -> $"Name(%s{name})"
+
+[<Struct>]
+type ItemValidationFailure =
+  | EmptyItem
+  | ItemExists of name: string
+
+  member this.AsString =
+    match this with
+    | EmptyItem -> "The Item has no name"
+    | ItemExists name -> $"ItemExists(%s{name})"
+
+[<Struct>]
+type ItemFailure =
+  | ItemExists
+  | FailedToUpdateItem of
+    failedUpdateItem: TrackListItem *
+    prop: UpdatableItemProp
+  | FailedToDeleteItem of failedDeleteItem: TrackListItem
+  | FailedToCreateItem of failedCreationItem: string
+
+type Model =
+  { Items: list<TrackListItem>
+    TrackListId: string
+    CurrentItem: string
+    CanAddCurrentItem: bool
+    HideDone: bool
+    CanShare: bool
+    ShowConfirmDeleteModal: ValueOption<TrackListItem> }
+
+type Message =
+  | SetHideDone of bool
+  | SetItemList of list<TrackListItem>
+  | SetNewItem of TrackListItem
+  | UpdateItem of item: TrackListItem
+  | RemoveItem of TrackListItem
+  | SetCurrentItem of string
+  | ShowConfirmDeleteModal of ValueOption<TrackListItem>
+  | ItemFailure of ItemFailure
 
 
 [<RequireQualifiedAccess>]
-module ListItems =
-  let stringifyItems (items: list<TrackListItem>) : string =
-    let isDoneToX (isDone: bool) = if isDone then 'x' else ' '
+module Actions =
 
-    let stringified =
-      items
-      |> Array.ofList
-      |> Array.Parallel.map (fun item ->
-        sprintf "[ %c ] %s" (isDoneToX item.IsDone) item.Name)
-
-    System.String.Join('\n', stringified)
-
-  type State =
-    { Items: list<TrackListItem>
-      TrackListId: ValueOption<string>
-      CurrentItem: string
-      CanAddCurrentItem: bool
-      HideDone: bool
-      CanShare: bool
-      ShowConfirmDeleteModal: ValueOption<TrackListItem> }
-
-
-  type UpdatableItemProp =
-    | IsDone of bool
-    | Name of string
-
-  type Msg =
-    | GoBack
-    | SetCurrentItem of string
-
-    | GetItems
-    | GetItemsSuccess of seq<TrackListItem>
-
-    | ValidateItem of string
-    | ValidateItemSuccess of itemExists: bool * name: string
-
-    | ValidateExisting of TrackListItem
-    | ValidateExistingSuccess of itemExists: bool * item: TrackListItem
-    | UpdateItemProp of item: TrackListItem * prop: UpdatableItemProp
-    | UpdateItemPropSuccess of TrackListItem
-
-    | DeleteItem of TrackListItem
-    | DeleteItemSuccess of TrackListItem
-
-    | CreateItem of string
-    | CreateItemSuccess of TrackListItem
-
-    | ShowConfirmDeleteModal of ValueOption<TrackListItem>
-    | ShowConfirmDeleteModalAction of TrackListItem * Result<bool, unit>
-
-    | ShareRequest of list<TrackListItem>
-    | ShareRequestSuccess
-
-    | ToClipboard of list<TrackListItem>
-    | ToClipboardSuccess
-
-    | RequestHideDone
-    | RequestHideDoneSuccess of bool
-
-    | SaveHideDone
-    | SaveHideDoneSuccess
-
-    | HideDone of bool
-
-    | Error of exn
-
-
-  let init (listId: ValueOption<string>) (canShare: bool) =
-    { Items = []
-      TrackListId = listId
-      HideDone = false
-      CurrentItem = ""
-      CanAddCurrentItem = false
-      CanShare = canShare
-      ShowConfirmDeleteModal = ValueNone },
-    Cmd.batch [ Cmd.ofMsg RequestHideDone ]
-
-  let update
-    (msg: Msg)
-    (state: State)
-    (onGoBackRequested: unit -> unit)
-    (js: IJSRuntime)
-    =
-    let emptyListId =
-      state, Cmd.ofMsg (Error(exn "ListId cannot be Empty"))
-
-    match msg with
-    | GoBack ->
-      onGoBackRequested ()
-      state, Cmd.none
-    | HideDone hide ->
-      { state with HideDone = hide },
-      Cmd.batch
-        [ Cmd.ofMsg GetItems
-          Cmd.ofMsg SaveHideDone ]
-    | SetCurrentItem item ->
-      { state with CurrentItem = item }, Cmd.ofMsg (ValidateItem(item))
-    | RequestHideDone ->
-      let listId =
-        defaultValueArg state.TrackListId "X"
-
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.GetHideDone"
-        [| listId |]
-        RequestHideDoneSuccess
-        (fun _ -> GetItems)
-    | RequestHideDoneSuccess hideDone ->
-      { state with HideDone = hideDone }, Cmd.ofMsg GetItems
-    | SaveHideDone ->
-      let listId =
-        defaultValueArg state.TrackListId "X"
-
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.SaveHideDone"
-        [| listId; state.HideDone |]
-        (fun _ -> SaveHideDoneSuccess)
-        Error
-    | SaveHideDoneSuccess -> state, Cmd.none
-    | GetItems ->
-      match state.TrackListId with
-      | ValueSome listId ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.GetListItems"
-          [| listId; state.HideDone |]
-          GetItemsSuccess
-          Error
-      | ValueNone -> emptyListId
-    | GetItemsSuccess list ->
-      { state with
-          Items =
-            list
-            |> Seq.sortBy (fun item -> item.Name)
-            |> List.ofSeq },
-      Cmd.none
-    | ValidateItem item ->
-      match state.TrackListId with
-      | ValueSome listid ->
-        let onSuccess nameExists = ValidateItemSuccess(nameExists, item)
-
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.ListItemExists"
-          [| listid; state.CurrentItem |]
-          onSuccess
-          Error
-      | ValueNone -> emptyListId
-    | ValidateItemSuccess(nameExists, itemName) ->
-      let canAdd =
-        not nameExists && itemName.Length <> 0
-
-      { state with
-          CanAddCurrentItem = canAdd },
-      Cmd.none
-
-    | CreateItem item ->
-      match state.TrackListId with
-      | ValueSome listid ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.CreateListItem"
-          [| listid; item |]
-          CreateItemSuccess
-          Error
-      | ValueNone -> emptyListId
-    | CreateItemSuccess item ->
-      { state with
-          Items =
-            (item :: state.Items)
-            |> List.sortBy (fun item -> item.Name) },
-      Cmd.none
-    | UpdateItemProp(item, prop) ->
-      match prop with
-      | IsDone isDone ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.UpdateListItem"
-          [| { item with IsDone = isDone } |]
-          UpdateItemPropSuccess
-          Error
-      | Name name ->
-        state, Cmd.ofMsg (ValidateExisting { item with Name = name })
-    | ValidateExisting item ->
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.ListItemExists"
-        [| item.ListId; item.Name |]
-        (fun exists -> ValidateExistingSuccess(exists, item))
-        Error
-    | ValidateExistingSuccess(exists, item) ->
-      match exists with
-      | true -> state, Cmd.none
-      | false ->
-        state,
-        Cmd.OfJS.either
-          js
-          "Mandadin.Database.UpdateListItem"
-          [| item |]
-          UpdateItemPropSuccess
-          Error
-    | UpdateItemPropSuccess item ->
-      let items =
-        match state.HideDone, item.IsDone with
-        | true, true ->
-          state.Items
-          |> List.filter (fun i -> i.Id <> item.Id)
-        | _ ->
-          state.Items
-          |> List.map (fun i -> if i.Id = item.Id then item else i)
-
-
-      { state with
-          Items = items |> List.sortBy (fun item -> item.Name) },
-      Cmd.none
-    | ShowConfirmDeleteModal show ->
-      { state with
-          ShowConfirmDeleteModal = show },
-      Cmd.none
-    | ShowConfirmDeleteModalAction(item, result) ->
-      let cmd =
-        match result with
-        | Ok result when result -> Cmd.ofMsg (DeleteItem item)
-        | _ -> Cmd.ofMsg (ShowConfirmDeleteModal ValueNone)
-
-      state, cmd
-    | DeleteItem item ->
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.DeleteListItem"
-        [| item |]
-        DeleteItemSuccess
-        Error
-    | DeleteItemSuccess item ->
-      let items =
-        state.Items
-        |> List.filter (fun i -> i.Id <> item.Id)
-        |> List.sortBy (fun item -> item.Name)
-
-      { state with
-          Items = items
-          ShowConfirmDeleteModal = ValueNone },
-      Cmd.none
-
-    | ShareRequest items ->
-      let stringified = stringifyItems items
-
-      let idValue =
-        defaultValueArg state.TrackListId "Mandadin"
-
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Share.ShareContent"
-        [| idValue; stringified |]
-        (fun _ -> ShareRequestSuccess)
-        Error
-    | ShareRequestSuccess -> state, Cmd.none
-    | ToClipboard items ->
-      let stringified = stringifyItems items
-
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Clipboard.CopyTextToClipboard"
-        [| stringified |]
-        (fun _ -> ShareRequestSuccess)
-        Error
-    | ToClipboardSuccess -> state, Cmd.none
-    | Error ex ->
-      eprintfn "Update Error [%s]" ex.Message
-      state, Cmd.none
-
-  let private newItemForm (state: State) (dispatch: Dispatch<Msg>) =
-    let currentContentTxt =
-      "Nombre del objeto..."
-
-    form {
-      attr.``class`` "row flex-spaces background-muted border notes-form"
-      on.submit (fun _ -> CreateItem state.CurrentItem |> dispatch)
-
-      fieldset {
-        attr.``class`` "form-group"
-
-        label {
-          attr.``for`` "current-content"
-          text currentContentTxt
-        }
-
-        textarea {
-          attr.id "current-content"
-          attr.placeholder currentContentTxt
-          bind.input.string state.CurrentItem (SetCurrentItem >> dispatch)
-        }
-
-        label {
-          attr.``for`` "paperCheck1"
-          attr.``class`` "paper-check"
-
-          input {
-            attr.id "paperCheck1"
-            attr.name "paperChecks"
-            attr.``type`` "checkbox"
-            bind.``checked`` state.HideDone (HideDone >> dispatch)
-          }
-
-          span { text "Esconder Terminados" }
-        }
-      }
-
-      button {
-        attr.``type`` "submit"
-        attr.``class`` "paper-btn btn-small"
-        attr.disabled (not state.CanAddCurrentItem)
-        Icon.Get Save
-      }
+  let getItems (items: ITrackListItemService) itemParams dispatch _ =
+    valueTaskUnit {
+      let! items = items.GetItems itemParams
+      items |> SetItemList |> dispatch
     }
+    |> ignore
 
+  let createItem (items: ITrackListItemService) dispatch listId newName =
+    valueTaskUnit {
+      printfn "Creating item: %s on list %s" newName listId
 
-  let inline private listItem (dispatch: Dispatch<Msg>) (item: TrackListItem) =
+      match! items.CreateItem(listId, newName) with
+      | Ok created -> created |> SetNewItem |> dispatch
+      | Error error ->
+        match error with
+        | EmtptyString ->
+          "El objeto no puede tener un nombre vacio"
+          |> FailedToCreateItem
+          |> ItemFailure
+          |> dispatch
+        | ExistingItem name ->
+          $"El objeto {name} ya existe"
+          |> FailedToCreateItem
+          |> ItemFailure
+          |> dispatch
+        | CreationFailed _ ->
+          "Error al crear el objeto"
+          |> FailedToCreateItem
+          |> ItemFailure
+          |> dispatch
+    }
+    |> ignore
+
+  let deleteItem
+    (items: ITrackListItemService, dispatch)
+    (item: TrackListItem)
+    (confirm: Result<bool, unit>)
+    =
+    valueTaskUnit {
+      try
+        match confirm with
+        | Ok true -> do! items.DeleteItem item
+        | Ok _
+        | Error _ -> ShowConfirmDeleteModal ValueNone |> dispatch
+      with ex ->
+        item
+        |> FailedToDeleteItem
+        |> ItemFailure
+        |> dispatch
+    }
+    |> ignore
+
+  let private updateItem (items: ITrackListItemService, dispatch) item prop =
+    valueTaskUnit {
+      let updated =
+        match prop with
+        | IsDone isDone -> { item with IsDone = isDone }
+        | Name name -> { item with Name = name }
+
+      try
+        let! updated = items.UpdateItem updated
+        updated |> UpdateItem |> dispatch
+      with ex ->
+        FailedToUpdateItem(item, prop)
+        |> ItemFailure
+        |> dispatch
+    }
+    |> ignore
+
+  let updateIsDone dependencies item isDone =
+    updateItem dependencies item (IsDone isDone)
+
+  let updateName dependencies item name =
+    updateItem dependencies item (Name name)
+
+  let onHideDone (items: ITrackListItemService, dispatch) listId hideDone =
+    valueTaskUnit {
+      try
+        do! items.SetHideDone(listId, hideDone)
+        hideDone |> SetHideDone |> dispatch
+      with ex ->
+        hideDone |> SetHideDone |> dispatch
+    }
+    |> ignore
+
+[<RequireQualifiedAccess>]
+module Cmd =
+
+  let ofGetItems (items: ITrackListItemService) listId hideDone =
+    let tsk listId =
+      task {
+        let! items = items.GetItems(listId, hideDone)
+        return items
+      }
+
+    Cmd.OfTask.perform tsk listId SetItemList
+
+  let ofHideDone (items: ITrackListItemService, listId) =
+    let tsk listId =
+      task {
+        let! hideDone = items.GetHideDone listId
+        return hideDone
+      }
+
+    Cmd.OfTask.perform tsk listId SetHideDone
+
+[<RequireQualifiedAccess>]
+module private Components =
+
+  let ListItem dependencies (item: TrackListItem) =
+    let _, dispatch = dependencies
+
     li {
       attr.``class`` "listitem-item"
       attr.key item.Id
@@ -348,14 +190,11 @@ module ListItems =
         attr.``class`` "listitem-item-checkbox"
         attr.id item.Id
 
-        bind.``checked`` item.IsDone (fun isDone ->
-          UpdateItemProp(item, (IsDone isDone)) |> dispatch)
+        bind.``checked`` item.IsDone (Actions.updateIsDone dependencies item)
       }
 
       input {
-        bind.input.string item.Name (fun name ->
-          ValidateExisting { item with Name = name }
-          |> dispatch)
+        bind.input.string item.Name (Actions.updateName dependencies item)
       }
 
       button {
@@ -365,70 +204,112 @@ module ListItems =
       }
     }
 
-  let toolbar (state: State) (dispatch: Dispatch<Msg>) =
-    let getId =
-      defaultValueArg state.TrackListId ""
+  let RemoveItem dpendencies state =
+    cond state.ShowConfirmDeleteModal
+    <| function
+      | ValueSome item ->
+        let title = "Borrar Elemento."
 
-    div {
-      attr.``class`` "border"
+        let subtitle =
+          "Esta operacion es irreversible."
 
-      section {
-        attr.``class`` "row flex-center"
-        h4 { text getId }
-      }
+        let txt =
+          $"Proceder con el borrado de '%s{item.Name}'?"
 
-      section {
-        attr.``class`` "row flex-center"
+        Modals.DeleteResourceModal
+          (title, subtitle, txt)
+          (Actions.deleteItem dpendencies item)
+      | ValueNone -> empty ()
 
-        button {
-          attr.``class`` "paper-btn btn-small"
-          on.click (fun _ -> dispatch GoBack)
-          Icon.Get Back
-        }
+[<RequireQualifiedAccess>]
+module ListItems =
 
-        cond state.CanShare
-        <| function
-          | true ->
-            button {
-              attr.``class`` "paper-btn btn-small"
-              on.click (fun _ -> ShareRequest state.Items |> dispatch)
-              Icon.Get Share
-            }
-          | false -> empty ()
+  let init (items: ITrackListItemService) (listId: string) (canShare: bool) =
+    { Items = []
+      TrackListId = listId
+      HideDone = false
+      CurrentItem = ""
+      CanAddCurrentItem = false
+      CanShare = canShare
+      ShowConfirmDeleteModal = ValueNone },
+    Cmd.ofHideDone (items, listId)
 
-        button {
-          attr.``class`` "paper-btn btn-small"
-          on.click (fun _ -> ToClipboard state.Items |> dispatch)
-          Icon.Get Copy
-        }
-      }
-    }
+  let update
+    (logger: ILogger, items: ITrackListItemService)
+    (msg: Message)
+    (model: Model)
+    =
 
-  let view (state: State) (dispatch: Dispatch<Msg>) =
-    let deleteModal (item: TrackListItem) =
-      let title = "Borrar Elemento"
+    match msg with
+    | SetHideDone hide ->
+      { model with HideDone = hide },
+      Cmd.ofGetItems items model.TrackListId hide
+    | SetCurrentItem item -> { model with CurrentItem = item }, Cmd.none
+    | SetItemList items -> { model with Items = items }, Cmd.none
+    | SetNewItem item ->
+      { model with
+          CurrentItem = ""
+          Items =
+            (item :: model.Items)
+            |> List.sortBy (fun item -> item.Name) },
+      Cmd.none
+    | UpdateItem item ->
+      { model with
+          Items =
+            model.Items
+            |> List.map (fun i -> if i.Id = item.Id then item else i) },
+      Cmd.none
+    | ShowConfirmDeleteModal show ->
+      { model with
+          ShowConfirmDeleteModal = show },
+      Cmd.none
+    | RemoveItem item ->
+      let items =
+        model.Items
+        |> List.filter (fun i -> i.Id <> item.Id)
+        |> List.sortBy (fun item -> item.Name)
 
-      let subtitle =
-        "esta operacion es irreversible"
+      { model with
+          Items = items
+          ShowConfirmDeleteModal = ValueNone },
+      Cmd.none
+    | ItemFailure(error) ->
+      match error with
+      | ItemExists -> logger.LogDebug("Item already exists")
+      | FailedToCreateItem item ->
+        logger.LogError("Failed to create item: {item}", item)
+      | FailedToUpdateItem(failedUpdateItem, prop) ->
+        logger.LogError(
+          "Failed to update item: {failedUpdateItem} with prop: {prop}",
+          failedUpdateItem,
+          prop.AsString
+        )
+      | FailedToDeleteItem(failedDeleteItem) ->
+        logger.LogDebug(
+          "Failed to delete item: {failedDeleteItem}",
+          failedDeleteItem
+        )
 
-      let txt =
-        sprintf """Proceder con el borrado de "%s"?""" item.Name
+      model, Cmd.none
 
-      let showModal =
-        state.ShowConfirmDeleteModal.IsSome
-
-      Modals.DeleteResourceModal (title, subtitle, txt) showModal (fun result ->
-        ShowConfirmDeleteModalAction(item, result)
-        |> dispatch)
+  let view dependencies (state: Model) (dispatch: Dispatch<Message>) =
+    let items, share, onBackRequested =
+      dependencies
 
     article {
-      toolbar state dispatch
-      newItemForm state dispatch
+      TrackListComponents.Toolbar(state, share, onBackRequested)
 
-      cond state.ShowConfirmDeleteModal
-      <| function
-        | ValueSome value -> deleteModal value
-        | ValueNone -> empty ()
+      comp<NewItemForm> {
+        "HideDone" => state.HideDone
+
+        "OnSubmit"
+        => Actions.createItem items dispatch state.TrackListId
+
+        "OnHideDoneChange"
+        => Actions.onHideDone (items, dispatch) state.TrackListId
+      }
+
+      Components.RemoveItem (items, dispatch) state
 
       ul {
         attr.``class`` "tracklist-list"
@@ -436,32 +317,49 @@ module ListItems =
         virtualize.comp {
           virtualize.placeholder (fun _ -> div { text "Cargando..." })
           let! item = virtualize.items state.Items
-          listItem dispatch item
+          Components.ListItem (items, dispatch) item
         }
 
       }
     }
 
 
-  type Page() =
-    inherit ProgramComponent<State, Msg>()
+type Page() =
+  inherit ProgramComponent<Model, Message>()
 
-    [<Parameter>]
-    member val OnBackRequested: (unit -> unit) = id with get, set
+  [<Parameter>]
+  member val OnBackRequested: (unit -> unit) = ignore with get, set
 
-    [<Parameter>]
-    member val ListId: ValueOption<string> = ValueNone with get, set
+  [<Parameter>]
+  member val ListId: ValueOption<string> = ValueNone with get, set
 
-    [<Parameter>]
-    member val CanShare: bool = false with get, set
+  [<Parameter>]
+  member val CanShare: bool = false with get, set
 
-    override this.Program =
-      let init _ = init this.ListId this.CanShare
+  override this.Program =
 
-      let update msg state =
-        update msg state this.OnBackRequested this.JSRuntime
+    let items =
+      this.Services.GetService<ITrackListItemService>()
 
-      Program.mkProgram init update view
+    let share =
+      this.Services.GetService<IShareService>()
+
+    let loggerFactory =
+      this.Services.GetService<ILoggerFactory>()
+
+    let logger =
+      loggerFactory.CreateLogger<Page>()
+
+    let init _ =
+      ListItems.init items this.ListId.Value this.CanShare
+
+    let update =
+      ListItems.update (logger, items)
+
+    let view =
+      ListItems.view (items, share, this.OnBackRequested)
+
+    Program.mkProgram init update view
 #if DEBUG
-      |> Program.withConsoleTrace
+    |> Program.withConsoleTrace
 #endif

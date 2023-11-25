@@ -1,6 +1,9 @@
 namespace Mandadin.Client
 
 open Bolero
+open System.Threading.Tasks
+
+open FsToolkit.ErrorHandling
 
 [<RequireQualifiedAccess>]
 type Page =
@@ -62,6 +65,34 @@ type Icon =
   | Close
   | Check
   | Back
+
+[<Struct>]
+type TaskListItemError =
+  | EmtptyString
+  | ExistingItem of name: string
+  | CreationFailed of error: exn
+
+type ITrackListItemService =
+
+  abstract GetHideDone: listId: string -> ValueTask<bool>
+  abstract SetHideDone: listId: string * hideDone: bool -> ValueTask
+
+  abstract GetItems:
+    listId: string * ?hideDone: bool -> ValueTask<TrackListItem list>
+
+  abstract ItemExists: listId: string * name: string -> ValueTask<bool>
+
+  abstract CreateItem:
+    listId: string * name: string ->
+      TaskResult<TrackListItem, TaskListItemError>
+
+  abstract UpdateItem: item: TrackListItem -> ValueTask<TrackListItem>
+  abstract DeleteItem: item: TrackListItem -> ValueTask
+
+type IShareService =
+  abstract Share: listId: string * content: string -> ValueTask
+  abstract ToClipboard: content: string -> ValueTask
+
 
 [<RequireQualifiedAccess>]
 module Icon =
