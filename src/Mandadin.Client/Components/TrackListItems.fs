@@ -1,11 +1,15 @@
 namespace Mandadin.Client.Components.TrackListItems
 
 open System
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Components
+
+open IcedTasks
 
 open Bolero
 open Bolero.Html
 open Mandadin.Client
+
 
 type NewItemForm() =
   inherit Component()
@@ -15,7 +19,8 @@ type NewItemForm() =
   member val HideDone: bool = false with get, set
 
   [<Parameter>]
-  member val OnSubmit: string -> unit = ignore with get, set
+  member val OnSubmit: string -> Task =
+    fun _ -> Task.CompletedTask with get, set
 
   [<Parameter>]
   member val OnHideDoneChange: bool -> unit = ignore with get, set
@@ -23,7 +28,12 @@ type NewItemForm() =
   override self.Render() =
     form {
       attr.``class`` "row flex-spaces background-muted border notes-form"
-      on.submit (fun _ -> self.OnSubmit objectName)
+
+      on.task.submit (fun _ ->
+        taskUnit {
+          do! self.OnSubmit objectName
+          objectName <- ""
+        })
 
       fieldset {
         attr.``class`` "form-group"
@@ -123,7 +133,8 @@ type TrackListComponents =
                 let content =
                   state.Items |> TrackListItems.Stringify
 
-                share.Share(state.TrackListId, content) |> ignore)
+                share.ShareTracklistItem(state.TrackListId, content)
+                |> ignore)
 
               Icon.Get Share
             }
