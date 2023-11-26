@@ -1,253 +1,252 @@
-namespace Mandadin.Client.Views
+namespace Mandadin.Client.Views.Notes
+
+open System
+
+open Microsoft.JSInterop
+open Microsoft.AspNetCore.Components
+
+open IcedTasks
 
 open Elmish
-open Microsoft.JSInterop
 open Bolero
 open Bolero.Html
 open Bolero.Remoting.Client
+
 open Mandadin.Client
-open Microsoft.AspNetCore.Components
 
-[<RequireQualifiedAccess>]
-module Notes =
+type NewNoteForm() =
+  inherit Component()
 
-  type State =
-    { CurrentContent: string
-      Notes: list<Note>
-      CanShare: bool }
+  let mutable noteContent: string = ""
 
-  type Msg =
-    | SetCurrentContent of string
+  [<Parameter>]
+  member val OnNewNote: (Note -> unit) = ignore with get, set
 
-    | DeleteNote of Id: string * Rev: string
-    | DeleteNoteSuccess of array<string>
+  [<Inject>]
+  member val NoteService: INoteService =
+    Unchecked.defaultof<INoteService> with get, set
 
-    | GetNotes
-    | GetNotesSuccess of seq<Note>
+  [<Inject>]
+  member val Share: IShareService =
+    Unchecked.defaultof<IShareService> with get, set
 
-    | CreateNote of string
-    | CreateNoteSuccess of Note
-
-    | UpdateNote of Note
-    | UpdateNoteSuccess of Note
-
-    (* Web API Cases*)
-    | FromClipboard
-    | FromClipboardSuccess of string
-
-    | ToClipboard of Note
-    | ToClipboardSuccess
-
-    | ShareContent of Note
-    | ShareContentSuccess
-
-    (* Any error will land here *)
-    | Error of exn
-
-  let private init (canShare: bool) =
-    { CurrentContent = ""
-      Notes = list.Empty
-      CanShare = canShare },
-    Cmd.ofMsg GetNotes
-
-  let private update (msg: Msg) (state: State) (js: IJSRuntime) =
-    match msg with
-    | SetCurrentContent content ->
-      { state with CurrentContent = content }, Cmd.none
-    | DeleteNote(noteid, rev) ->
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.DeleteNote"
-        [| noteid; rev |]
-        DeleteNoteSuccess
-        Error
-    | DeleteNoteSuccess arr ->
-      let noteid = Array.head arr
-
-      let notes =
-        state.Notes
-        |> List.filter (fun note -> note.Id <> noteid)
-
-      { state with Notes = notes }, Cmd.none
-    | GetNotes ->
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.FindNotes"
-        [||]
-        GetNotesSuccess
-        Error
-    | GetNotesSuccess notes ->
-      { state with
-          Notes = notes |> List.ofSeq },
-      Cmd.none
-    | CreateNote content ->
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.CreateNote"
-        [| content |]
-        CreateNoteSuccess
-        Error
-    | CreateNoteSuccess note ->
-      { state with
-          Notes = note :: state.Notes },
-      Cmd.none
-    | UpdateNote note ->
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Database.UpdateNote"
-        [| note |]
-        UpdateNoteSuccess
-        Error
-    | UpdateNoteSuccess updated ->
-      let notes =
-        state.Notes
-        |> List.map (fun note ->
-          if note.Id = updated.Id then
-            updated
-          else
-            note)
-
-      { state with
-          Notes = notes
-          CurrentContent = "" },
-      Cmd.none
-    | FromClipboard ->
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Clipboard.ReadTextFromClipboard"
-        [||]
-        FromClipboardSuccess
-        Error
-    | FromClipboardSuccess content ->
-      { state with CurrentContent = content }, Cmd.none
-    | ToClipboard note ->
-      let text =
-        sprintf "Nota Mandadin:\n%s " note.Content
-
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Clipboard.CopyTextToClipboard"
-        [| text |]
-        (fun _ -> ToClipboardSuccess)
-        Error
-    | ToClipboardSuccess -> state, Cmd.none
-    | ShareContent note ->
-      let title = "Nota"
-      let text = sprintf "%s" note.Content
-
-      state,
-      Cmd.OfJS.either
-        js
-        "Mandadin.Share.ShareContent"
-        [| title; text; "" |]
-        (fun _ -> ShareContentSuccess)
-        Error
-    | ShareContentSuccess -> state, Cmd.none
-    | Error err ->
-      eprintfn "%s" err.Message
-      state, Cmd.none
-
-  let private newNoteForm (state: State) (dispatch: Dispatch<Msg>) =
-    let submitBtnTxt = "Guardar"
-    let currentContentTxt = "Escribe algo..."
-
+  override self.Render() : Node =
     form {
       attr.``class`` "row flex-spaces background-muted border notes-form"
-      on.submit (fun _ -> CreateNote(state.CurrentContent) |> dispatch)
+
+      on.task.submit (fun _ ->
+        taskUnit {
+          let! created = self.NoteService.CreateNote noteContent
+
+          match created with
+          | ValueSome note ->
+            self.OnNewNote note
+            noteContent <- ""
+          | ValueNone -> ()
+        })
 
       fieldset {
         attr.``class`` "form-group"
 
         label {
           attr.``for`` "current-content"
-          text currentContentTxt
+          text "Escribe algo..."
         }
 
         textarea {
           attr.id "current-content"
-          attr.placeholder currentContentTxt
-          bind.input.string state.CurrentContent (SetCurrentContent >> dispatch)
+          attr.placeholder "Escribe algo..."
+          bind.input.string noteContent (fun text -> noteContent <- text)
         }
       }
 
       button {
         attr.``type`` "submit"
-        attr.disabled (state.CurrentContent.Length = 0)
-        text submitBtnTxt
+        attr.disabled (String.IsNullOrWhiteSpace noteContent)
+        text "Guardar"
       }
 
       button {
         attr.``type`` "button"
-        on.click (fun _ -> FromClipboard |> dispatch)
+
+        on.task.click (fun _ ->
+          taskUnit {
+            let! content = self.Share.FromClipboard()
+            noteContent <- content
+          })
+
         Icon.Get Clipboard
       }
     }
 
-  let private noteItem (item: Note) (canShare: bool) (dispatch: Dispatch<Msg>) =
+
+type NoteItem() =
+  inherit Component()
+
+  let textAreaRef = HtmlRef()
+
+  member private self.onTextAreaBlur _ =
+    taskUnit {
+      match textAreaRef.Value with
+      | Some ref ->
+        let! content =
+          self.jsRuntime.InvokeAsync<string>("Mandadin.Elements.GetValue", ref)
+
+        if
+          content <> self.Note.Content
+          && not (String.IsNullOrWhiteSpace content)
+        then
+          self.OnNoteChanged(content, self.Note)
+      | None -> ()
+
+      return ()
+    }
+
+  [<Parameter>]
+  member val OnNoteChanged: (string * Note -> unit) = ignore with get, set
+
+  [<Parameter>]
+  member val OnNoteDeleted: (Note -> unit) = ignore with get, set
+
+  [<Parameter>]
+  member val Note: Note = Unchecked.defaultof<Note> with get, set
+
+  [<Parameter>]
+  member val CanShare: bool = false with get, set
+
+  [<Inject>]
+  member val NoteService: INoteService =
+    Unchecked.defaultof<INoteService> with get, set
+
+  [<Inject>]
+  member val Share: IShareService =
+    Unchecked.defaultof<IShareService> with get, set
+
+  [<Inject>]
+  member val jsRuntime: IJSRuntime =
+    Unchecked.defaultof<IJSRuntime> with get, set
+
+  override self.Render() : Node =
+
     li {
       attr.``class`` "note-list-item m-05"
 
       textarea {
-        bind.input.string item.Content (fun text ->
-          dispatch (UpdateNote { item with Content = text }))
+        attr.value self.Note.Content
 
-        section {
-          attr.``class`` "row"
+        on.task.blur self.onTextAreaBlur
 
-          button {
-            attr.``class`` "paper-btn btn-small btn-muted-outline"
-            on.click (fun _ -> ToClipboard item |> dispatch)
-            Icon.Get Copy
-          }
+        textAreaRef
+      }
 
-          cond canShare
-          <| function
-            | false -> empty ()
-            | true ->
-              button {
-                attr.``class`` "paper-btn btn-small btn-muted-outline"
-                on.click (fun _ -> ShareContent item |> dispatch)
-                Icon.Get Share
-              }
+      section {
+        attr.``class`` "row"
 
-          button {
-            attr.``class`` "paper-btn btn-small btn-danger-outline"
-            on.click (fun _ -> DeleteNote(item.Id, item.Rev) |> dispatch)
-            Icon.Get Trash
-          }
+        button {
+          attr.``class`` "paper-btn btn-small btn-muted-outline"
+
+          on.task.click (fun _ ->
+            taskUnit { do! self.Share.ToClipboard self.Note.Content })
+
+          Icon.Get Copy
+        }
+
+        cond self.CanShare
+        <| function
+          | false -> empty ()
+          | true ->
+            button {
+              attr.``class`` "paper-btn btn-small btn-muted-outline"
+
+              on.task.click (fun _ ->
+                taskUnit { do! self.Share.ShareNote self.Note.Content })
+
+              Icon.Get Share
+            }
+
+        button {
+          attr.``class`` "paper-btn btn-small btn-danger-outline"
+          on.click (fun _ -> self.OnNoteDeleted self.Note)
+          Icon.Get Trash
         }
       }
     }
 
-  let view (state: State) (dispatch: Dispatch<Msg>) =
+
+type Page() =
+  inherit Component()
+  let mutable notes: list<Note> = list.Empty
+  let mutable isSaving = false
+
+  member self.Notes
+    with get () = notes
+    and set v =
+      notes <- v
+      self.StateHasChanged()
+
+  [<Parameter>]
+  member val CanShare: bool = false with get, set
+
+  [<Inject>]
+  member val NoteService: INoteService =
+    Unchecked.defaultof<INoteService> with get, set
+
+  member private self.onDeleteNote note =
+    valueTaskUnit {
+      do! self.NoteService.DeleteNote note
+
+      self.Notes <-
+        self.Notes
+        |> List.filter (fun n -> n.Id <> note.Id)
+    }
+    |> ignore
+
+  member private self.onNoteChanged(content, note) =
+    valueTaskUnit {
+      if isSaving then
+        return ()
+
+      isSaving <- true
+      let! note = self.NoteService.UpdateNote(content, note)
+
+      match note with
+      | ValueSome note ->
+        self.Notes <-
+          self.Notes
+          |> List.map (fun n -> if n.Id = note.Id then note else n)
+      | ValueNone -> ()
+
+      isSaving <- false
+    }
+    |> ignore
+
+  override self.OnInitializedAsync() =
+    taskUnit {
+      let! foundNotes = self.NoteService.GetNotes()
+      self.Notes <- foundNotes
+    }
+
+  override self.Render() : Node =
     article {
-      newNoteForm state dispatch
+      comp<NewNoteForm> {
+        "OnNewNote"
+        => (fun note -> self.Notes <- note :: self.Notes)
+      }
 
       ul {
         attr.``class`` "notes-list"
 
         virtualize.comp {
           virtualize.placeholder (fun _ -> div { text "Cargando..." })
-          let! item = virtualize.items state.Notes
-          noteItem item state.CanShare dispatch
+          let! item = virtualize.items self.Notes
+
+          comp<NoteItem> {
+            "Note" => item
+            "CanShare" => true
+            "OnNoteChanged" => self.onNoteChanged
+
+            "OnNoteDeleted" => self.onDeleteNote
+          }
         }
       }
     }
-
-
-  type Page() as this =
-    inherit ProgramComponent<State, Msg>()
-
-    [<Parameter>]
-    member val CanShare: bool = false with get, set
-
-    override _.Program =
-      let init (_: 'arg) = init this.CanShare
-      let update msg state = update msg state this.JSRuntime
-      Program.mkProgram init update view

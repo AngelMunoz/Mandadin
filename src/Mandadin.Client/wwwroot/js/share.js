@@ -25,7 +25,7 @@ export function CanShare() {
  */
 export function ShareContent(title, text, url = undefined) {
   if (navigator.share) {
-    return navigator.share({ title, text, url: url ?? location.href });
+    return navigator.share({ title, text, url });
   }
   return Promise.reject("Share API not available");
 }

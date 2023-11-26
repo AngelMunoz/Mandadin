@@ -77,7 +77,7 @@ module Actions =
     |> ignore
 
   let createItem (items: ITrackListItemService) dispatch listId newName =
-    valueTaskUnit {
+    taskUnit {
       printfn "Creating item: %s on list %s" newName listId
 
       match! items.CreateItem(listId, newName) with
@@ -100,7 +100,6 @@ module Actions =
           |> ItemFailure
           |> dispatch
     }
-    |> ignore
 
   let deleteItem
     (items: ITrackListItemService, dispatch)

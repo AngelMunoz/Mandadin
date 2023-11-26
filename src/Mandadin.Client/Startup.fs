@@ -21,16 +21,18 @@ module Program =
         else
           LogLevel.Debug
 
+      builder.Logging.SetMinimumLevel(level) |> ignore
+
       builder.Logging.AddFilter(
         "Microsoft.AspNetCore.Components.RenderTree.*",
         LogLevel.Warning
       )
       |> ignore
 
-      builder.Logging.SetMinimumLevel(level) |> ignore
 
       builder.Services
         .AddSingleton<ITrackListItemService>(Services.ListItems.factory)
+        .AddSingleton<INoteService>(Services.Notes.factory)
         .AddSingleton<IShareService>(Services.Share.factory)
       |> ignore
 

@@ -62,5 +62,13 @@ GetTheme();
       GetHideDone,
       SaveHideDone,
     },
+    Elements: {
+      GetValue(elt) {
+        if (elt) {
+          return elt.value;
+        }
+        return "";
+      },
+    },
   };
 })(window);

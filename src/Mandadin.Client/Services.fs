@@ -23,7 +23,28 @@ module Share =
       loggerFactory.CreateLogger<IShareService>()
 
     { new IShareService with
-        member _.Share
+        member _.FromClipboard() =
+          valueTask {
+            logger.LogDebug("Getting content from clipboard...")
+
+            try
+              let! content =
+                jsRuntime.InvokeAsync<string>(
+                  "Mandadin.Clipboard.ReadTextFromClipboard",
+                  [||]
+                )
+
+              return content
+            with exn ->
+              logger.LogError(
+                "Failed to get content from clipboard: {exn}",
+                exn
+              )
+
+              return ""
+          }
+
+        member _.ShareTracklistItem
           (
             listId: string,
             content: string
@@ -39,6 +60,20 @@ module Share =
               )
           }
 
+        member _.ShareNote(content: string) : Threading.Tasks.ValueTask =
+          valueTaskUnit {
+            logger.LogDebug(
+              "Sharing Content: '{content}'...",
+              content.Substring(0, 20)
+            )
+
+            do!
+              jsRuntime.InvokeVoidAsync(
+                "Mandadin.Share.ShareContent",
+                [| "Nota..." :> obj; content |]
+              )
+          }
+
         member _.ToClipboard(content: string) : Threading.Tasks.ValueTask =
           valueTaskUnit {
             logger.LogDebug(
@@ -51,6 +86,86 @@ module Share =
                 "Mandadin.Clipboard.CopyTextToClipboard",
                 [| content :> obj |]
               )
+          } }
+
+module Notes =
+  open System.Threading.Tasks
+
+  let inline factory (services: IServiceProvider) : INoteService =
+    let jsRuntime =
+      services.GetService<IJSRuntime>()
+
+    let loggerFactory =
+      services.GetService<ILoggerFactory>()
+
+    let logger =
+      loggerFactory.CreateLogger<INoteService>()
+
+
+    { new INoteService with
+        member _.CreateNote(content: string) =
+          valueTask {
+            logger.LogDebug("Creating note...")
+
+            try
+              let! note =
+                jsRuntime.InvokeAsync<Note>(
+                  "Mandadin.Database.CreateNote",
+                  [| content :> obj |]
+                )
+
+              return ValueSome note
+            with exn ->
+              logger.LogError("Failed to create note: {exn}", exn)
+
+              return ValueNone
+          }
+
+        member _.DeleteNote(note: Note) =
+          valueTaskUnit {
+            logger.LogDebug("Deleting note: {note}", note)
+
+            return!
+              jsRuntime.InvokeVoidAsync(
+                "Mandadin.Database.DeleteNote",
+                [| note.Id :> obj; note.Rev |]
+              )
+          }
+
+        member _.UpdateNote(content, note) =
+          valueTask {
+            logger.LogDebug("Updating note: {note}", note)
+
+            try
+              let! updated =
+                jsRuntime.InvokeAsync<Note>(
+                  "Mandadin.Database.UpdateNote",
+                  [| { note with Content = content } :> obj |]
+                )
+
+              return ValueSome updated
+            with exn ->
+              logger.LogError("Failed to update note: {exn}", exn)
+
+              return ValueNone
+          }
+
+        member _.GetNotes() =
+          valueTask {
+            logger.LogDebug("Getting notes...")
+
+            try
+              let! notes =
+                jsRuntime.InvokeAsync<list<Note>>(
+                  "Mandadin.Database.FindNotes",
+                  [||]
+                )
+
+              return notes
+            with exn ->
+              logger.LogError("Failed to get notes: {exn}", exn)
+
+              return List.empty
           } }
 
 module ListItems =
