@@ -89,9 +89,20 @@ type ITrackListItemService =
   abstract UpdateItem: item: TrackListItem -> ValueTask<TrackListItem>
   abstract DeleteItem: item: TrackListItem -> ValueTask
 
+type INoteService =
+  abstract GetNotes: unit -> ValueTask<list<Note>>
+  abstract CreateNote: content: string -> ValueTask<ValueOption<Note>>
+
+  abstract UpdateNote:
+    content: string * note: Note -> ValueTask<ValueOption<Note>>
+
+  abstract DeleteNote: note: Note -> ValueTask
+
 type IShareService =
-  abstract Share: listId: string * content: string -> ValueTask
+  abstract ShareTracklistItem: listId: string * content: string -> ValueTask
+  abstract ShareNote: content: string -> ValueTask
   abstract ToClipboard: content: string -> ValueTask
+  abstract FromClipboard: unit -> ValueTask<string>
 
 
 [<RequireQualifiedAccess>]
